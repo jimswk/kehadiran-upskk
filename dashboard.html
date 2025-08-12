@@ -3,56 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dashboard - Kehadiran UPSKK</title>
+  <title>Dashboard - Kehadiran</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <div class="container">
-    <h1>🏢 Dashboard Kehadiran</h1>
-    <p id="userInfo"></p>
+    <h1>🏢 Kehadiran Automatik</h1>
+    <p id="userInfo">Sila daftar muka dahulu</p>
 
-    <!-- Tab Navigation -->
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="face">📸 Kamera</button>
-      <button class="tab-btn" data-tab="qr">🔢 QR Code</button>
-    </div>
+    <p id="status">Memuat model muka...</p>
+    <video id="video" width="640" height="480" autoplay muted></video>
+    <canvas id="overlay" width="640" height="480"></canvas>
 
-    <!-- Tab: Kamera -->
-    <div id="face-tab" class="tab-content">
-      <p id="status">Memuat model muka...</p>
-      <video id="video" width="640" height="480" autoplay muted></video>
-      <canvas id="overlay" width="640" height="480"></canvas>
-      <div class="controls">
-        <button id="checkInBtn" disabled>✅ Check-In</button>
-        <button id="checkOutBtn" disabled>❌ Check-Out</button>
-      </div>
-    </div>
-
-    <!-- Tab: QR Code -->
-    <div id="qr-tab" class="tab-content" style="display:none;">
-      <p>Scan QR Code di pejabat untuk check-in:</p>
-      <div id="qr-reader" style="width: 100%; max-width: 500px; margin: 10px auto;"></div>
-      <button id="qrCheckIn" disabled style="background:#9b59b6">📱 Check-In via QR</button>
-    </div>
-
-    <!-- Rekod & PDF -->
     <div id="logs">
       <h2>📋 Rekod Bulanan</h2>
       <ul id="logList"></ul>
-      <button id="generatePdfBtn">🖨️ Jana PDF Laporan</button>
+      <button id="generatePdfBtn" disabled>🖨️ Jana PDF Laporan</button>
     </div>
   </div>
 
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-
+  <script>
+    const db = firebase.firestore();
+    let currentUser = null;
+  </script>
   <script src="js/face-detection.js"></script>
-  <script src="js/qr-scanner.js"></script>
   <script src="js/app.js"></script>
   <script src="js/pdf-generator.js"></script>
 </body>

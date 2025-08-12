@@ -1,11 +1,12 @@
 // Initialize Firebase (Ganti dengan config anda)
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abc123"
+  apiKey: "AIzaSyAB1Lqs-9EHLFI-pnMnKwyHYogNNQq7F8A",
+  authDomain: "kehadiran-upskk.firebaseapp.com",
+  projectId: "kehadiran-upskk",
+  storageBucket: "kehadiran-upskk.firebasestorage.app",
+  messagingSenderId: "705500257324",
+  appId: "1:705500257324:web:692f800a74a2f8c3d18589",
+  measurementId: "G-FKGN5NLLTK"
 };
 
 firebase.initializeApp(firebaseConfig);

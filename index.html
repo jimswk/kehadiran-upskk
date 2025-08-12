@@ -10,6 +10,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- QR Code -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <!-- jsQR for scanning QR codes -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         body {
@@ -227,6 +229,7 @@
         let videoStream = null;
         let isProcessing = false;
         let scanMode = 'face'; // 'face' atau 'qr'
+        let qrScannerInterval = null;
 
         // DOM Elements
         const loginPageDiv = document.getElementById('loginPage');
@@ -236,7 +239,9 @@
         const statusMessageDiv = document.getElementById('statusMessage');
         const videoElement = document.getElementById('videoElement');
         const scanVideoElement = document.getElementById('scanVideoElement');
+        const qrScannerVideo = document.getElementById('qrScannerVideo');
         const canvasElement = document.getElementById('canvasElement');
+        const qrCanvas = document.getElementById('qrCanvas');
         const attendanceTableBody = document.getElementById('attendanceTableBody');
         const userNameDisplay = document.getElementById('userName');
         const userIdDisplay = document.getElementById('userIdDisplay');
@@ -299,6 +304,10 @@
              if (videoStream) {
                 videoStream.getTracks().forEach(track => track.stop());
                 videoStream = null;
+            }
+             if (qrScannerInterval) {
+                clearInterval(qrScannerInterval);
+                qrScannerInterval = null;
             }
         }
 
@@ -479,7 +488,7 @@
             scanMode = 'qr';
             faceScanModeDiv.classList.add('hidden');
             qrScanModeDiv.classList.remove('hidden');
-            startCamera(document.getElementById('qrScannerVideo'));
+            startQrScan();
             showStatusMessage('Sedia untuk imbas QR code.', 'info');
         };
 
@@ -490,6 +499,32 @@
             stopCamera();
             hideStatusMessage();
         };
+
+        async function startQrScan() {
+            await startCamera(qrScannerVideo);
+            const qrContext = qrCanvas.getContext('2d');
+            qrScannerInterval = setInterval(() => {
+                if (qrScannerVideo.readyState === qrScannerVideo.HAVE_ENOUGH_DATA) {
+                    qrCanvas.height = qrScannerVideo.videoHeight;
+                    qrCanvas.width = qrScannerVideo.videoWidth;
+                    qrContext.drawImage(qrScannerVideo, 0, 0, qrCanvas.width, qrCanvas.height);
+                    const imageData = qrContext.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+                    
+                    if (code) {
+                        clearInterval(qrScannerInterval);
+                        stopCamera();
+                        const scannedData = code.data;
+                        if (scannedData === userId) {
+                           showStatusMessage('QR Code sepadan. Melakukan tindakan clock...', 'success');
+                           window.handleClockAction();
+                        } else {
+                            showStatusMessage('QR Code tidak sepadan.', 'error');
+                        }
+                    }
+                }
+            }, 1000/30);
+        }
         
         window.handleClockAction = async function() {
             showStatusMessage('Dapatkan lokasi...', 'info');
@@ -687,15 +722,22 @@
 
         // Event Listeners
         document.addEventListener('DOMContentLoaded', () => {
+            // Halaman Log Masuk
             document.getElementById('loginBtn').addEventListener('click', window.handleEmailLogin);
             document.getElementById('goToRegisterBtn').addEventListener('click', () => showPage('accountRegistrationPage'));
+
+            // Halaman Pendaftaran Akaun
             document.getElementById('registerAccountBtn').addEventListener('click', window.handleAccountRegistration);
             document.getElementById('backToLoginBtn').addEventListener('click', () => showPage('loginPage'));
+
+            // Halaman Pendaftaran Wajah
             document.getElementById('registerFaceSubmitBtn').addEventListener('click', window.handleFaceRegistration);
-            document.getElementById('returnToLoginBtn').addEventListener('click', () => {
-                window.showPage('loginPage');
-            });
-            document.getElementById('clockButton').addEventListener('click', window.handleFaceCheck);
+            document.getElementById('returnToLoginBtn').addEventListener('click', () => showPage('loginPage'));
+
+            // Dashboard
+            document.getElementById('faceScanBtn').addEventListener('click', window.handleFaceCheck);
+            document.getElementById('switchToQrBtn').addEventListener('click', window.switchToQrScanMode);
+            document.getElementById('switchToFaceBtn').addEventListener('click', window.switchToFaceScanMode);
             document.getElementById('generatePdfBtn').addEventListener('click', window.generatePDF);
             document.getElementById('signOutBtn').addEventListener('click', window.handleSignOut);
         });

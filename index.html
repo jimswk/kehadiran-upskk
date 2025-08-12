@@ -148,10 +148,17 @@
                     <button id="switchToQrBtn" class="mt-4 w-full text-blue-600 hover:underline">Gunakan QR Code</button>
                 </div>
                 <div id="qrScanMode" class="hidden">
-                    <p class="mb-4 text-center text-gray-600">Imbas QR Code untuk Clock In/Out.</p>
+                    <p class="mb-4 text-center text-gray-600">Imbas QR Code untuk Clock In/Out atau muat naik imej.</p>
                     <video id="qrScannerVideo" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
                     <canvas id="qrCanvas" class="hidden"></canvas>
                     <button id="switchToFaceBtn" class="mt-4 w-full text-blue-600 hover:underline">Gunakan Pengecaman Wajah</button>
+                    <button id="toggleCameraBtn" class="mt-4 w-full py-2 px-4 text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 transition-colors duration-200">
+                        Tukar Kamera
+                    </button>
+                    <label for="qrUploadInput" class="mt-4 w-full py-2 px-4 text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 transition-colors duration-200 cursor-pointer text-center">
+                        Muat Naik QR Code
+                    </label>
+                    <input type="file" id="qrUploadInput" accept="image/*" class="hidden">
                 </div>
             </div>
 
@@ -228,8 +235,9 @@
         let userData = null;
         let videoStream = null;
         let isProcessing = false;
-        let scanMode = 'face'; // 'face' atau 'qr'
         let qrScannerInterval = null;
+        let allCameras = [];
+        let currentCameraIndex = 0;
 
         // DOM Elements
         const loginPageDiv = document.getElementById('loginPage');
@@ -245,14 +253,14 @@
         const attendanceTableBody = document.getElementById('attendanceTableBody');
         const userNameDisplay = document.getElementById('userName');
         const userIdDisplay = document.getElementById('userIdDisplay');
-        const clockButton = document.getElementById('clockButton');
-        const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
+        const faceScanModeDiv = document.getElementById('faceScanMode');
+        const qrScanModeDiv = document.getElementById('qrScanMode');
         const faceScanBtn = document.getElementById('faceScanBtn');
         const switchToQrBtn = document.getElementById('switchToQrBtn');
         const switchToFaceBtn = document.getElementById('switchToFaceBtn');
-        const faceScanModeDiv = document.getElementById('faceScanMode');
-        const qrScanModeDiv = document.getElementById('qrScanMode');
         const downloadQrBtn = document.getElementById('downloadQrBtn');
+        const toggleCameraBtn = document.getElementById('toggleCameraBtn');
+
 
         window.jsPDF = window.jspdf.jsPDF;
 
@@ -311,16 +319,40 @@
             }
         }
 
-        async function startCamera(videoEl) {
+        async function startCamera(videoEl, deviceId) {
             stopCamera();
+            const constraints = { video: { deviceId: deviceId ? { exact: deviceId } : undefined } };
             try {
-                videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
                 videoEl.srcObject = videoStream;
             } catch (error) {
                 showStatusMessage('Gagal mengakses kamera. Sila berikan kebenaran.', 'error');
                 console.error(error);
             }
         }
+        
+        async function listCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                allCameras = devices.filter(device => device.kind === 'videoinput');
+                if (allCameras.length > 1) {
+                    toggleCameraBtn.classList.remove('hidden');
+                } else {
+                    toggleCameraBtn.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error("Error listing devices:", error);
+            }
+        }
+
+        async function toggleCamera() {
+            if (allCameras.length > 1) {
+                currentCameraIndex = (currentCameraIndex + 1) % allCameras.length;
+                const newDeviceId = allCameras[currentCameraIndex].deviceId;
+                await startCamera(qrScannerVideo, newDeviceId);
+            }
+        }
+
 
         function captureImage(videoEl) {
             const context = canvasElement.getContext('2d');
@@ -389,7 +421,7 @@
         window.handleFaceRegistration = async function() {
             if (isProcessing) return;
             isProcessing = true;
-            registerFaceSubmitBtn.disabled = true;
+            document.getElementById('registerFaceSubmitBtn').disabled = true;
             showStatusMessage('Memulakan kamera...', 'info');
             await startCamera(videoElement);
 
@@ -415,7 +447,7 @@
                 console.error(error);
             } finally {
                 isProcessing = false;
-                registerFaceSubmitBtn.disabled = false;
+                document.getElementById('registerFaceSubmitBtn').disabled = false;
                 window.showPage('loginPage'); // Kembali ke login setelah pendaftaran
             }
         };
@@ -473,58 +505,18 @@
                     await window.handleClockAction();
                 } else {
                     showStatusMessage('Wajah tidak sepadan. Sila cuba lagi.', 'error');
+                    switchToQrBtn.click(); // Switch to QR mode if face scan fails
                 }
             } catch (error) {
                 showStatusMessage('Gagal mengesan wajah. Sila cuba lagi.', 'error');
                 console.error(error);
+                switchToQrBtn.click(); // Switch to QR mode if an error occurs
             } finally {
                 isProcessing = false;
                 faceScanBtn.disabled = false;
-                stopCamera();
+                // stopCamera(); // Let camera run for face scan mode
             }
         };
-
-        window.switchToQrScanMode = function() {
-            scanMode = 'qr';
-            faceScanModeDiv.classList.add('hidden');
-            qrScanModeDiv.classList.remove('hidden');
-            startQrScan();
-            showStatusMessage('Sedia untuk imbas QR code.', 'info');
-        };
-
-        window.switchToFaceScanMode = function() {
-            scanMode = 'face';
-            faceScanModeDiv.classList.remove('hidden');
-            qrScanModeDiv.classList.add('hidden');
-            stopCamera();
-            hideStatusMessage();
-        };
-
-        async function startQrScan() {
-            await startCamera(qrScannerVideo);
-            const qrContext = qrCanvas.getContext('2d');
-            qrScannerInterval = setInterval(() => {
-                if (qrScannerVideo.readyState === qrScannerVideo.HAVE_ENOUGH_DATA) {
-                    qrCanvas.height = qrScannerVideo.videoHeight;
-                    qrCanvas.width = qrScannerVideo.videoWidth;
-                    qrContext.drawImage(qrScannerVideo, 0, 0, qrCanvas.width, qrCanvas.height);
-                    const imageData = qrContext.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-                    
-                    if (code) {
-                        clearInterval(qrScannerInterval);
-                        stopCamera();
-                        const scannedData = code.data;
-                        if (scannedData === userId) {
-                           showStatusMessage('QR Code sepadan. Melakukan tindakan clock...', 'success');
-                           window.handleClockAction();
-                        } else {
-                            showStatusMessage('QR Code tidak sepadan.', 'error');
-                        }
-                    }
-                }
-            }, 1000/30);
-        }
         
         window.handleClockAction = async function() {
             showStatusMessage('Dapatkan lokasi...', 'info');
@@ -545,13 +537,6 @@
                 const docSnap = await getDoc(docRef);
                 const currentTime = new Date();
 
-                // Shifts
-                const shifts = [
-                    { start: { hour: 7, minute: 30 }, end: { hour: 16, minute: 30 } },
-                    { start: { hour: 8, minute: 0 }, end: { hour: 17, minute: 0 } },
-                    { start: { hour: 8, minute: 30 }, end: { hour: 17, minute: 30 } }
-                ];
-                
                 if (docSnap.exists() && docSnap.data().clockIn) {
                     const clockInTime = docSnap.data().clockIn.toDate();
                     const totalHours = (currentTime - clockInTime) / (1000 * 60 * 60);
@@ -672,6 +657,48 @@
             QRCode.toCanvas(document.getElementById('qrCodeCanvas'), data, err => {
                 if (err) console.error(err);
             });
+            
+            const canvas = document.getElementById('qrCodeCanvas');
+            const dataURL = canvas.toDataURL('image/png');
+            const downloadLink = document.getElementById('downloadQrBtn');
+            downloadLink.href = dataURL;
+            downloadLink.download = `QR_Code_${userId}.png`;
+        }
+
+        async function handleQrUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function() {
+                const imageData = reader.result;
+                
+                // Decode QR code from the uploaded image
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    context.drawImage(img, 0, 0, img.width, img.height);
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+                    if (code) {
+                        const scannedData = code.data;
+                        if (scannedData === userId) {
+                            showStatusMessage('QR Code sepadan. Melakukan tindakan clock...', 'success');
+                            window.handleClockAction();
+                        } else {
+                            showStatusMessage('QR Code tidak sepadan.', 'error');
+                        }
+                    } else {
+                        showStatusMessage('Tidak dapat mengesan QR Code dari imej.', 'error');
+                    }
+                };
+                img.src = imageData;
+            };
+            reader.readAsDataURL(file);
         }
 
         function getCurrentDate() { return new Date().toISOString().slice(0, 10); }
@@ -740,6 +767,8 @@
             document.getElementById('switchToFaceBtn').addEventListener('click', window.switchToFaceScanMode);
             document.getElementById('generatePdfBtn').addEventListener('click', window.generatePDF);
             document.getElementById('signOutBtn').addEventListener('click', window.handleSignOut);
+            document.getElementById('qrUploadInput').addEventListener('change', handleQrUpload);
+            document.getElementById('toggleCameraBtn').addEventListener('click', window.toggleCamera);
         });
     </script>
 </body>

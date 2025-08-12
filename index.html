@@ -248,7 +248,10 @@
         // Muat model Face-API.js
         async function loadFaceModels() {
             showStatusMessage('Memuatkan model pengecaman wajah...');
-            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/weights';
+            
+            // ✅ Correct URL pointing to GitHub raw content
+            const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+        
             try {
                 await Promise.all([
                     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -258,8 +261,8 @@
                 showStatusMessage('Model berjaya dimuatkan.', 'success');
                 return true;
             } catch (error) {
-                showStatusMessage('Gagal muat model. Semak internet dan muat semula.', 'error');
-                console.error('Error:', error);
+                console.error('Error loading face-api models:', error);
+                showStatusMessage('Gagal muat model. Semak sambungan internet atau cuba semula.', 'error');
                 return false;
             }
         }

@@ -175,6 +175,7 @@
         let faceMatcher = null;
         let videoStream = null;
         let faceDetectionInterval = null;
+        let modelsLoaded = false; // Status muatan model
 
         // DOM Elements
         const dashboardDiv = document.getElementById('dashboard');
@@ -191,8 +192,7 @@
         // Pastikan jsPDF tersedia
         window.jsPDF = window.jspdf.jsPDF;
 
-        // ✅ GUNAKAN MODEL DARI GITHUB ANDA
-        // Gantikan 'username' dan 'repo' dengan milik anda
+        // URL model face-api.js dari GitHub
         const MODEL_URL = 'https://raw.githubusercontent.com/jimswk/kehadiran-upskk/main/weights';
 
         // Fungsi: Kira jarak (Haversine)
@@ -244,6 +244,9 @@
 
         // Muat model face-api.js
         async function loadFaceModels() {
+            if (modelsLoaded) {
+                return true;
+            }
             showStatusMessage('Memuatkan model wajah...');
             try {
                 await Promise.all([
@@ -251,6 +254,7 @@
                     faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
                     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
                 ]);
+                modelsLoaded = true;
                 showStatusMessage('Model berjaya dimuatkan.', 'success');
                 return true;
             } catch (error) {
@@ -278,8 +282,10 @@
                 return;
             }
 
-            const modelsLoaded = await loadFaceModels();
-            if (!modelsLoaded) return;
+            if (!modelsLoaded) {
+                showStatusMessage('Model sedang dimuatkan, sila tunggu sebentar.', 'info');
+                return;
+            }
 
             showStatusMessage('Mengesan wajah...');
             videoElement.play();
@@ -320,9 +326,11 @@
         }
 
         window.handleFaceCheck = async function() {
+            if (!modelsLoaded) {
+                showStatusMessage('Model sedang dimuatkan, sila tunggu sebentar.', 'info');
+                return;
+            }
             showStatusMessage('Mengesan wajah...');
-            const modelsLoaded = await loadFaceModels();
-            if (!modelsLoaded) return;
             await startCamera();
 
             videoElement.play();
@@ -360,22 +368,66 @@
                     showStatusMessage(`Anda berada ${distance.toFixed(2)}m dari pejabat.`, 'error');
                     return;
                 }
+                showStatusMessage('Lokasi disahkan. Menyimpan data...', 'info');
 
                 const docRef = doc(db, 'artifacts', appId, 'users', userId, 'attendance', getCurrentDate());
                 const docSnap = await getDoc(docRef);
                 const currentTime = new Date();
 
+                // Logic to determine shift and OT
+                let isClockInLate = false;
+                let isClockOutEarly = false;
+                let totalHours = 0;
+                let totalOT = 0;
+                let matchedShift = shifts[0];
+
                 if (docSnap.exists() && docSnap.data().clockIn) {
+                    // Clock Out
                     const clockInTime = docSnap.data().clockIn.toDate();
-                    const totalHours = (currentTime - clockInTime) / (1000 * 60 * 60);
-                    await setDoc(docRef, { clockOut: currentTime, totalHours }, { merge: true });
+                    totalHours = (currentTime - clockInTime) / (1000 * 60 * 60);
+                    
+                    const timeInToday = new Date(clockInTime.getFullYear(), clockInTime.getMonth(), clockInTime.getDate(), clockInTime.getHours(), clockInTime.getMinutes());
+                    let minTimeDiff = Infinity;
+                    shifts.forEach(shift => {
+                        const shiftStart = new Date(timeInToday.getFullYear(), timeInToday.getMonth(), timeInToday.getDate(), shift.start.hour, shift.start.minute);
+                        const timeDiff = Math.abs(timeInToday.getTime() - shiftStart.getTime());
+                        if (timeDiff < minTimeDiff) {
+                            minTimeDiff = timeDiff;
+                            matchedShift = shift;
+                        }
+                    });
+
+                    const clockOutTimeExpected = new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate(), matchedShift.end.hour, matchedShift.end.minute);
+                    isClockOutEarly = currentTime < clockOutTimeExpected;
+
+                    if (currentTime > clockOutTimeExpected) {
+                        totalOT = (currentTime - clockOutTimeExpected) / (1000 * 60 * 60);
+                    }
+
+                    await setDoc(docRef, {
+                        clockOut: currentTime,
+                        totalHours,
+                        totalOT,
+                        locationOut: { lat: latitude, lng: longitude },
+                        isClockOutEarly,
+                        matchedShift: matchedShift.id
+                    }, { merge: true });
                     showStatusMessage('Clock Out Berjaya!', 'success');
                 } else {
+                    // Clock In
+                    const timeInToday = new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate(), currentTime.getHours(), currentTime.getMinutes());
+                    const shift1Start = new Date(timeInToday.getFullYear(), timeInToday.getMonth(), timeInToday.getDate(), shifts[0].start.hour, shifts[0].start.minute);
+                    
+                    if (timeInToday > shift1Start) {
+                        isClockInLate = true;
+                    }
+
                     await setDoc(docRef, {
                         date: currentTime,
                         weekday: currentTime.toLocaleDateString('ms-MY', { weekday: 'long' }),
                         clockIn: currentTime,
-                        locationIn: { lat: latitude, lng: longitude }
+                        locationIn: { lat: latitude, lng: longitude },
+                        isClockInLate
                     }, { merge: true });
                     showStatusMessage('Clock In Berjaya!', 'success');
                 }
@@ -398,13 +450,13 @@
             const doc = new jsPDF('p', 'mm', 'a4');
             doc.setFont('helvetica');
             doc.setFontSize(14);
-            doc.text('Laporan Kehadiran Bulanan', 14, 20);
+            doc.text('Total Time Card', 14, 20);
 
             const startStr = startOfMonth.toISOString().slice(0, 10);
             const endStr = endOfMonth.toISOString().slice(0, 10);
             doc.setFontSize(10);
-            doc.text(`Tarikh: ${startStr} hingga ${endStr}`, 14, 30);
-            doc.text(`Nama: ${userData?.name || 'Pengguna'}, Jabatan: ${userData?.department || 'Tidak Dikenali'}`, 14, 40);
+            doc.text(`Start Date ${startStr} End Date ${endStr}`, 14, 30);
+            doc.text(`First Name: ${userData?.name || 'Pengguna'}, Department: ${userData?.department || 'Tiada'}`, 14, 40);
 
             const headers = ["Tarikh", "Hari", "Masuk", "Keluar", "Jam", "OT"];
             let y = 50;
@@ -414,13 +466,12 @@
             data.forEach(item => {
                 doc.text(item.date.toDate().toISOString().slice(0, 10), 14, y);
                 doc.text(item.weekday, 44, y);
-                doc.text(item.clockIn ? item.clockIn.toDate().toLocaleTimeString() : '-', 74, y);
-                doc.text(item.clockOut ? item.clockOut.toDate().toLocaleTimeString() : '-', 104, y);
+                doc.text(item.clockIn ? item.clockIn.toDate().toLocaleTimeString('ms-MY') : '-', 74, y);
+                doc.text(item.clockOut ? item.clockOut.toDate().toLocaleTimeString('ms-MY') : '-', 104, y);
                 doc.text(item.totalHours?.toFixed(2) || '-', 134, y);
                 doc.text(item.totalOT?.toFixed(2) || '-', 164, y);
                 y += 5;
             });
-
             doc.save('Laporan_Kehadiran.pdf');
         };
 
@@ -428,13 +479,22 @@
             attendanceTableBody.innerHTML = '';
             data.forEach(item => {
                 const row = document.createElement('tr');
+                const date = item.date.toDate().toISOString().slice(0, 10);
+                const weekday = item.weekday;
+                const clockInTime = item.clockIn ? item.clockIn.toDate().toLocaleTimeString('ms-MY') : '-';
+                const clockOutTime = item.clockOut ? item.clockOut.toDate().toLocaleTimeString('ms-MY') : '-';
+                const totalHours = item.totalHours ? item.totalHours.toFixed(2) : '-';
+                const totalOT = item.totalOT ? item.totalOT.toFixed(2) : '-';
+                const clockInClass = item.isClockInLate ? 'text-red-500 font-bold' : '';
+                const clockOutClass = item.isClockOutEarly ? 'text-red-500 font-bold' : '';
+
                 row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.date.toDate().toISOString().slice(0, 10)}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.weekday}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm ${item.isClockInLate ? 'text-red-500 font-bold' : 'text-green-500'}">${item.clockIn ? item.clockIn.toDate().toLocaleTimeString() : '-'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm ${item.isClockOutEarly ? 'text-red-500 font-bold' : 'text-green-500'}">${item.clockOut ? item.clockOut.toDate().toLocaleTimeString() : '-'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.totalHours?.toFixed(2) || '-'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.totalOT?.toFixed(2) || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${weekday}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockInClass}">${clockInTime}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockOutClass}">${clockOutTime}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalHours}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalOT}</td>
                 `;
                 attendanceTableBody.appendChild(row);
             });
@@ -452,6 +512,9 @@
 
         // Inisialisasi
         window.onload = async function() {
+            // Memuat model di latar belakang untuk masa respons yang lebih baik
+            loadFaceModels();
+
             await signInAnonymously(auth).catch(() => {
                 showStatusMessage('Gagal log masuk.', 'error');
             });
@@ -485,18 +548,18 @@
                         updateAttendanceTable(data);
                     });
 
-                    showDashboard();
+                    window.showDashboard();
                 }
             });
         };
 
         // Event Listeners
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('registerFaceBtn')?.addEventListener('click', window.showRegistration);
-            document.getElementById('clockButton')?.addEventListener('click', window.handleFaceCheck);
-            document.getElementById('generatePdfBtn')?.addEventListener('click', window.generatePDF);
-            document.getElementById('backToDashboardBtn')?.addEventListener('click', window.showDashboard);
-            document.getElementById('registerFaceSubmitBtn')?.addEventListener('click', window.handleFaceRegistration);
+            document.getElementById('registerFaceBtn').addEventListener('click', window.showRegistration);
+            document.getElementById('clockButton').addEventListener('click', window.handleFaceCheck);
+            document.getElementById('generatePdfBtn').addEventListener('click', window.generatePDF);
+            document.getElementById('backToDashboardBtn').addEventListener('click', window.showDashboard);
+            document.getElementById('registerFaceSubmitBtn').addEventListener('click', window.handleFaceRegistration);
         });
     </script>
 </body>

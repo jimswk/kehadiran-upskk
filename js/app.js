@@ -1,60 +1,68 @@
-const db = firebase.firestore();
 let currentUser = null;
 
 window.onload = () => {
-  const userStr = localStorage.getItem('user');
-  if (!userStr) {
+  const savedUser = localStorage.getItem('user');
+  if (!savedUser) {
+    alert("Sila daftar muka dahulu.");
     window.location.href = 'index.html';
     return;
   }
-  currentUser = JSON.parse(userStr);
-  document.getElementById('userInfo').textContent = `Hai, ${currentUser.name} (ID: ${currentUser.staffId}) | Shift: ${getShiftTime(currentUser.shift)}`;
+
+  currentUser = JSON.parse(savedUser);
+  document.getElementById('userInfo').textContent = `Nama: ${currentUser.name} | ID: ${currentUser.staffId}`;
+  document.getElementById('generatePdfBtn').disabled = false;
+
   loadLogs();
 };
 
-function getShiftTime(shift) {
-  const times = {
-    "7:30": "7:30-4:30",
-    "8:00": "8:00-5:00",
-    "8:30": "8:30-5:30"
-  };
-  return times[shift] || "8:00-5:00";
-}
+function autoCheckInOrOut() {
+  if (!currentUser) return;
 
-function recordAttendance(type) {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+
   navigator.geolocation.getCurrentPosition(async (pos) => {
     const { latitude, longitude } = pos.coords;
     const office = { lat: 1.547828, lng: 110.343048 };
     const distance = calculateDistance(latitude, longitude, office.lat, office.lng);
 
     if (distance > 50) {
-      alert(`❌ Anda berada ${distance.toFixed(0)}m dari pejabat. Had: 50m`);
+      document.getElementById('status').textContent = `❌ Terlalu jauh dari pejabat (${distance.toFixed(0)}m)`;
       return;
     }
 
-    const now = new Date();
-    const docId = `${currentUser.staffId}_${now.toISOString().split('T')[0]}`;
+    // Semak rekod hari ini
+    const docId = `${currentUser.staffId}_${today}`;
+    const docRef = db.collection('attendance').doc(docId);
 
-    await db.collection('attendance').doc(docId).set({
+    const doc = await docRef.get();
+    const type = doc.exists && doc.data().type === 'Check-In' ? 'Check-Out' : 'Check-In';
+
+    await docRef.set({
       name: currentUser.name,
       staffId: currentUser.staffId,
       type,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-      date: now.toISOString().split('T')[0],
+      date: today,
       time: now.toLocaleTimeString('ms-MY'),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       latitude,
       longitude,
       distance: `${distance.toFixed(0)}m`
     }, { merge: true });
 
-    alert(`${type} berjaya!`);
+    document.getElementById('status').textContent = `✅ ${type} berjaya: ${now.toLocaleTimeString('ms-MY')}`;
     loadLogs();
+
+    // Elak rekod berulang
+    await new Promise(r => setTimeout(r, 5000));
   }, (err) => {
-    alert("Gagal dapat lokasi: " + err.message);
+    console.error("Lokasi gagal:", err);
   }, { timeout: 10000 });
 }
 
 async function loadLogs() {
+  if (!currentUser) return;
+
   const snapshot = await db.collection('attendance')
     .where('staffId', '==', currentUser.staffId)
     .orderBy('timestamp', 'desc')

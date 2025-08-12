@@ -112,8 +112,11 @@
         <div id="faceRegistrationPage" class="hidden flex flex-col items-center p-4">
             <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Pendaftaran Wajah</h2>
             <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
-                <p class="mb-4 text-center text-gray-600">Sila hadapkan wajah ke kamera.</p>
-                <video id="videoElement" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
+                <p class="mb-4 text-center text-gray-600">Sila hadapkan wajah ke kamera untuk beberapa saat.</p>
+                <div id="cameraContainer" class="relative">
+                    <video id="videoElement" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
+                    <div id="faceFrame" class="absolute inset-0 border-4 rounded-lg hidden"></div>
+                </div>
                 <canvas id="canvasElement" class="hidden"></canvas>
                 <button id="registerFaceSubmitBtn" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
                     Mula Daftar Wajah
@@ -128,16 +131,35 @@
                 <p class="text-xl font-medium text-gray-700" id="userName">Selamat Datang</p>
                 <p class="text-sm text-gray-500" id="userIdDisplay"></p>
             </div>
-
-            <button id="clockButton" class="w-full max-w-sm py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                Clock In / Clock Out
-            </button>
             
+            <div id="scanModeContainer" class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
+                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Clock In/Out</h3>
+                <div id="faceScanMode" class="">
+                    <p class="mb-4 text-center text-gray-600">Imbas wajah anda untuk Clock In/Out.</p>
+                    <div class="relative">
+                        <video id="scanVideoElement" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
+                        <div id="scanFaceFrame" class="absolute inset-0 border-4 rounded-lg hidden"></div>
+                    </div>
+                    <button id="faceScanBtn" class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
+                        Clock In / Clock Out
+                    </button>
+                    <button id="switchToQrBtn" class="mt-4 w-full text-blue-600 hover:underline">Gunakan QR Code</button>
+                </div>
+                <div id="qrScanMode" class="hidden">
+                    <p class="mb-4 text-center text-gray-600">Imbas QR Code untuk Clock In/Out.</p>
+                    <video id="qrScannerVideo" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
+                    <canvas id="qrCanvas" class="hidden"></canvas>
+                    <button id="switchToFaceBtn" class="mt-4 w-full text-blue-600 hover:underline">Gunakan Pengecaman Wajah</button>
+                </div>
+            </div>
+
             <div class="my-8 w-full max-w-sm">
-                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">QR Code Check-in</h3>
+                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">QR Code Anda</h3>
                 <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-inner">
                     <canvas id="qrCodeCanvas" class="border rounded-lg bg-white p-2"></canvas>
-                    <p class="mt-2 text-sm text-gray-500">Gunakan ini untuk Clock In/Out alternatif</p>
+                    <a id="downloadQrBtn" class="mt-4 w-full py-2 px-4 text-center text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200 cursor-pointer">
+                        Muat Turun QR Code
+                    </a>
                 </div>
             </div>
 
@@ -192,7 +214,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const appId = 'default-app-id'; // Use a default for local testing
+        const appId = 'default-app-id';
 
         // Koordinat pejabat (tukar jika perlu)
         const officeCoordinates = { latitude: 1.54287, longitude: 110.34752 };
@@ -204,6 +226,7 @@
         let userData = null;
         let videoStream = null;
         let isProcessing = false;
+        let scanMode = 'face'; // 'face' atau 'qr'
 
         // DOM Elements
         const loginPageDiv = document.getElementById('loginPage');
@@ -212,12 +235,19 @@
         const dashboardDiv = document.getElementById('dashboard');
         const statusMessageDiv = document.getElementById('statusMessage');
         const videoElement = document.getElementById('videoElement');
+        const scanVideoElement = document.getElementById('scanVideoElement');
         const canvasElement = document.getElementById('canvasElement');
         const attendanceTableBody = document.getElementById('attendanceTableBody');
         const userNameDisplay = document.getElementById('userName');
         const userIdDisplay = document.getElementById('userIdDisplay');
         const clockButton = document.getElementById('clockButton');
         const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
+        const faceScanBtn = document.getElementById('faceScanBtn');
+        const switchToQrBtn = document.getElementById('switchToQrBtn');
+        const switchToFaceBtn = document.getElementById('switchToFaceBtn');
+        const faceScanModeDiv = document.getElementById('faceScanMode');
+        const qrScanModeDiv = document.getElementById('qrScanMode');
+        const downloadQrBtn = document.getElementById('downloadQrBtn');
 
         window.jsPDF = window.jspdf.jsPDF;
 
@@ -272,22 +302,22 @@
             }
         }
 
-        async function startCamera() {
+        async function startCamera(videoEl) {
             stopCamera();
             try {
                 videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                videoElement.srcObject = videoStream;
+                videoEl.srcObject = videoStream;
             } catch (error) {
                 showStatusMessage('Gagal mengakses kamera. Sila berikan kebenaran.', 'error');
                 console.error(error);
             }
         }
 
-        function captureImage() {
+        function captureImage(videoEl) {
             const context = canvasElement.getContext('2d');
-            canvasElement.width = videoElement.videoWidth;
-            canvasElement.height = videoElement.videoHeight;
-            context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+            canvasElement.width = videoEl.videoWidth;
+            canvasElement.height = videoEl.videoHeight;
+            context.drawImage(videoEl, 0, 0, canvasElement.width, canvasElement.height);
             const imageData = canvasElement.toDataURL('image/jpeg', 0.8);
             return imageData.split(',')[1];
         }
@@ -311,7 +341,7 @@
                 await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data'), {
                     name: name,
                     department: department,
-                    referenceImage: null
+                    referenceImages: []
                 });
                 showStatusMessage('Pendaftaran akaun berjaya! Sila daftar wajah anda seterusnya.', 'success');
                 showPage('faceRegistrationPage');
@@ -352,42 +382,45 @@
             isProcessing = true;
             registerFaceSubmitBtn.disabled = true;
             showStatusMessage('Memulakan kamera...', 'info');
-            await startCamera();
+            await startCamera(videoElement);
 
             try {
                 await new Promise(resolve => setTimeout(resolve, 2000));
-                showStatusMessage('Mengambil gambar wajah...', 'info');
-                const referenceImage = captureImage();
+                showStatusMessage('Mengambil gambar wajah dari pelbagai sudut...', 'info');
+                
+                const referenceImages = [];
+                for (let i = 0; i < 5; i++) { // Ambil 5 imej
+                    referenceImages.push(captureImage(videoElement));
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Jeda 0.5s
+                }
                 
                 const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
                 await setDoc(userDocRef, {
-                    referenceImage: referenceImage
+                    referenceImages: referenceImages
                 }, { merge: true });
 
                 isFaceRegistered = true;
-                showStatusMessage('Pendaftaran wajah berjaya!', 'success');
+                showStatusMessage('Pendaftaran wajah berjaya! Sila log keluar untuk memulakan sistem.', 'success');
             } catch (error) {
                 showStatusMessage('Gagal mendaftar wajah. Sila cuba lagi.', 'error');
                 console.error(error);
             } finally {
                 isProcessing = false;
                 registerFaceSubmitBtn.disabled = false;
-                window.showPage('dashboard');
+                window.showPage('loginPage'); // Kembali ke login setelah pendaftaran
             }
         };
 
-        async function recognizeFaceWithGemini(referenceImage, liveImage) {
-            const prompt = `Adakah muka dalam gambar 'live' sepadan dengan muka dalam gambar 'rujukan'? Jawab dengan 'match' atau 'no match' sahaja. Jangan berikan sebarang maklumat tambahan.`;
+        async function recognizeFaceWithGemini(referenceImages, liveImage) {
+            const prompt = `Adakah muka dalam gambar 'live' sepadan dengan muka dalam mana-mana gambar dalam senarai 'rujukan'? Jawab dengan 'match' atau 'no match' sahaja. Jangan berikan sebarang maklumat tambahan.`;
             
-            const payload = {
-                contents: [{
-                    parts: [
-                        { text: prompt },
-                        { inlineData: { mimeType: "image/jpeg", data: referenceImage } },
-                        { inlineData: { mimeType: "image/jpeg", data: liveImage } }
-                    ]
-                }],
-            };
+            const parts = [{ text: prompt }];
+            for (const image of referenceImages) {
+                parts.push({ inlineData: { mimeType: "image/jpeg", data: image } });
+            }
+            parts.push({ inlineData: { mimeType: "image/jpeg", data: liveImage } });
+
+            const payload = { contents: [{ parts: parts }] };
 
             const apiKey = "";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
@@ -411,20 +444,20 @@
         window.handleFaceCheck = async function() {
             if (isProcessing) return;
             isProcessing = true;
-            clockButton.disabled = true;
+            faceScanBtn.disabled = true;
 
             showStatusMessage('Mengambil gambar dan membandingkan wajah...', 'info');
-            await startCamera();
+            await startCamera(scanVideoElement);
 
             try {
                 await new Promise(resolve => setTimeout(resolve, 2000));
-                const liveImage = captureImage();
+                const liveImage = captureImage(scanVideoElement);
 
                 const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
                 const userDocSnap = await getDoc(userDocRef);
-                const referenceImage = userDocSnap.data().referenceImage;
+                const referenceImages = userDocSnap.data().referenceImages;
                 
-                const isMatch = await recognizeFaceWithGemini(referenceImage, liveImage);
+                const isMatch = await recognizeFaceWithGemini(referenceImages, liveImage);
 
                 if (isMatch) {
                     showStatusMessage('Wajah sepadan! Melakukan tindakan clock...', 'success');
@@ -437,9 +470,25 @@
                 console.error(error);
             } finally {
                 isProcessing = false;
-                clockButton.disabled = false;
-                window.showPage('dashboard');
+                faceScanBtn.disabled = false;
+                stopCamera();
             }
+        };
+
+        window.switchToQrScanMode = function() {
+            scanMode = 'qr';
+            faceScanModeDiv.classList.add('hidden');
+            qrScanModeDiv.classList.remove('hidden');
+            startCamera(document.getElementById('qrScannerVideo'));
+            showStatusMessage('Sedia untuk imbas QR code.', 'info');
+        };
+
+        window.switchToFaceScanMode = function() {
+            scanMode = 'face';
+            faceScanModeDiv.classList.remove('hidden');
+            qrScanModeDiv.classList.add('hidden');
+            stopCamera();
+            hideStatusMessage();
         };
         
         window.handleClockAction = async function() {
@@ -461,6 +510,13 @@
                 const docSnap = await getDoc(docRef);
                 const currentTime = new Date();
 
+                // Shifts
+                const shifts = [
+                    { start: { hour: 7, minute: 30 }, end: { hour: 16, minute: 30 } },
+                    { start: { hour: 8, minute: 0 }, end: { hour: 17, minute: 0 } },
+                    { start: { hour: 8, minute: 30 }, end: { hour: 17, minute: 30 } }
+                ];
+                
                 if (docSnap.exists() && docSnap.data().clockIn) {
                     const clockInTime = docSnap.data().clockIn.toDate();
                     const totalHours = (currentTime - clockInTime) / (1000 * 60 * 60);
@@ -600,7 +656,7 @@
                         userNameDisplay.textContent = `Selamat Datang, ${userData.name}`;
                         userIdDisplay.textContent = `ID: ${userId}`;
                         generateQRCode(userId);
-                        isFaceRegistered = !!userData.referenceImage;
+                        isFaceRegistered = !!(userData.referenceImages && userData.referenceImages.length > 0);
                         
                         const q = query(
                             collection(db, 'artifacts', appId, 'users', userId, 'attendance'),

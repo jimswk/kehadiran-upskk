@@ -62,25 +62,76 @@
         <!-- Mesej Status -->
         <div id="statusMessage" class="message-box info hidden"></div>
 
+        <!-- Halaman Log Masuk -->
+        <div id="loginPage" class="flex flex-col items-center">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Log Masuk</h2>
+            <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
+                <div class="mb-4">
+                    <label for="loginEmailInput" class="block text-sm font-medium text-gray-700">E-mel</label>
+                    <input type="email" id="loginEmailInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="E-mel Anda">
+                </div>
+                <div class="mb-4">
+                    <label for="loginPasswordInput" class="block text-sm font-medium text-gray-700">Kata Laluan</label>
+                    <input type="password" id="loginPasswordInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Kata Laluan Anda">
+                </div>
+                <button id="loginBtn" class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
+                    Log Masuk
+                </button>
+                <button id="goToRegisterBtn" class="mt-4 w-full text-blue-600 hover:underline">Belum ada akaun? Daftar sekarang</button>
+            </div>
+        </div>
+
+        <!-- Halaman Pendaftaran Akaun -->
+        <div id="accountRegistrationPage" class="hidden flex flex-col items-center p-4">
+            <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Pendaftaran Akaun Baru</h2>
+            <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
+                <div class="mb-4">
+                    <label for="registerNameInput" class="block text-sm font-medium text-gray-700">Nama Penuh</label>
+                    <input type="text" id="registerNameInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Nama Penuh Anda">
+                </div>
+                <div class="mb-4">
+                    <label for="registerDepartmentInput" class="block text-sm font-medium text-gray-700">Jabatan</label>
+                    <input type="text" id="registerDepartmentInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Jabatan Anda">
+                </div>
+                <div class="mb-4">
+                    <label for="registerEmailInput" class="block text-sm font-medium text-gray-700">E-mel</label>
+                    <input type="email" id="registerEmailInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="E-mel Anda">
+                </div>
+                <div class="mb-4">
+                    <label for="registerPasswordInput" class="block text-sm font-medium text-gray-700">Kata Laluan</label>
+                    <input type="password" id="registerPasswordInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Kata Laluan Anda">
+                </div>
+                <button id="registerAccountBtn" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
+                    Daftar Akaun
+                </button>
+                <button id="backToLoginBtn" class="mt-4 text-blue-600 hover:underline">Kembali ke Log Masuk</button>
+            </div>
+        </div>
+        
+        <!-- Halaman Pendaftaran Wajah -->
+        <div id="faceRegistrationPage" class="hidden flex flex-col items-center p-4">
+            <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Pendaftaran Wajah</h2>
+            <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
+                <p class="mb-4 text-center text-gray-600">Sila hadapkan wajah ke kamera.</p>
+                <video id="videoElement" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
+                <canvas id="canvasElement" class="hidden"></canvas>
+                <button id="registerFaceSubmitBtn" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
+                    Mula Daftar Wajah
+                </button>
+            </div>
+        </div>
+
         <!-- Dashboard -->
-        <div id="dashboard" class="flex flex-col items-center">
+        <div id="dashboard" class="hidden flex flex-col items-center">
             <div id="user-info" class="text-center my-4">
                 <p class="text-xl font-medium text-gray-700" id="userName">Selamat Datang</p>
                 <p class="text-sm text-gray-500" id="userIdDisplay"></p>
             </div>
 
-            <div id="registrationWarning" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded-lg w-full">
-                <p class="font-bold">Perhatian</p>
-                <p>Sila daftarkan wajah anda untuk menggunakan fungsi pengecaman wajah.</p>
-                <button id="registerFaceBtn" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 transition-colors duration-200">
-                    Daftar Wajah Sekarang
-                </button>
-            </div>
-
             <button id="clockButton" class="w-full max-w-sm py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                 Clock In / Clock Out
             </button>
-
+            
             <div class="my-8 w-full max-w-sm">
                 <h3 class="text-xl font-bold mb-2 text-center text-gray-800">QR Code Check-in</h3>
                 <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-inner">
@@ -95,7 +146,7 @@
                     Jana Laporan PDF
                 </button>
             </div>
-
+            
             <div class="my-8 w-full">
                 <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Jadual Kehadiran Bulan Ini</h3>
                 <div class="table-container">
@@ -115,35 +166,15 @@
                     </table>
                 </div>
             </div>
-        </div>
 
-        <!-- Halaman Pendaftaran Wajah -->
-        <div id="registrationPage" class="hidden flex flex-col items-center p-4">
-            <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Pendaftaran Wajah</h2>
-            <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
-                <p class="mb-4 text-center text-gray-600">Sila isi maklumat dan hadapkan wajah ke kamera.</p>
-                <div class="mb-4">
-                    <label for="fullNameInput" class="block text-sm font-medium text-gray-700">Nama Penuh</label>
-                    <input type="text" id="fullNameInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Nama Penuh Anda">
-                </div>
-                <div class="mb-4">
-                    <label for="departmentInput" class="block text-sm font-medium text-gray-700">Jabatan</label>
-                    <input type="text" id="departmentInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Jabatan Anda">
-                </div>
-                <video id="videoElement" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
-                <canvas id="canvasElement" class="hidden"></canvas>
-                <button id="registerFaceSubmitBtn" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
-                    Mula Daftar Wajah
-                </button>
-                <button id="backToDashboardBtn" class="mt-4 text-blue-600 hover:underline">Kembali ke Dashboard</button>
-            </div>
+            <button id="signOutBtn" class="mt-4 text-red-600 hover:underline">Log Keluar</button>
         </div>
     </div>
 
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Konfigurasi Firebase
@@ -157,10 +188,10 @@
             measurementId: "G-FKGN5NLLTK"
         };
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
+        const appId = 'default-app-id'; // Use a default for local testing
 
         // Koordinat pejabat (tukar jika perlu)
         const officeCoordinates = { latitude: 1.54287, longitude: 110.34752 };
@@ -174,20 +205,41 @@
         let isProcessing = false;
 
         // DOM Elements
+        const loginPageDiv = document.getElementById('loginPage');
+        const accountRegistrationPageDiv = document.getElementById('accountRegistrationPage');
+        const faceRegistrationPageDiv = document.getElementById('faceRegistrationPage');
         const dashboardDiv = document.getElementById('dashboard');
-        const registrationPageDiv = document.getElementById('registrationPage');
         const statusMessageDiv = document.getElementById('statusMessage');
-        const registrationWarningDiv = document.getElementById('registrationWarning');
         const videoElement = document.getElementById('videoElement');
         const canvasElement = document.getElementById('canvasElement');
         const attendanceTableBody = document.getElementById('attendanceTableBody');
         const userNameDisplay = document.getElementById('userName');
         const userIdDisplay = document.getElementById('userIdDisplay');
         const clockButton = document.getElementById('clockButton');
-        const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
 
-        // Pastikan jsPDF tersedia
         window.jsPDF = window.jspdf.jsPDF;
+
+        // Shifts
+        const shifts = [
+            { start: { hour: 7, minute: 30 }, end: { hour: 16, minute: 30 } },
+            { start: { hour: 8, minute: 0 }, end: { hour: 17, minute: 0 } },
+            { start: { hour: 8, minute: 30 }, end: { hour: 17, minute: 30 } }
+        ];
+
+        // Fungsi: Mengawal paparan halaman
+        function showPage(pageId) {
+            loginPageDiv.classList.add('hidden');
+            accountRegistrationPageDiv.classList.add('hidden');
+            faceRegistrationPageDiv.classList.add('hidden');
+            dashboardDiv.classList.add('hidden');
+            
+            const pageToShow = document.getElementById(pageId);
+            if (pageToShow) {
+                pageToShow.classList.remove('hidden');
+            }
+            stopCamera();
+            hideStatusMessage();
+        }
 
         // Fungsi: Kira jarak (Haversine)
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -218,25 +270,6 @@
             }
         }
 
-        window.showDashboard = function() {
-            dashboardDiv.classList.remove('hidden');
-            registrationPageDiv.classList.add('hidden');
-            stopCamera(); // Menghentikan kamera jika ada
-            if (!isFaceRegistered) {
-                registrationWarningDiv.classList.remove('hidden');
-                clockButton.disabled = true;
-            } else {
-                registrationWarningDiv.classList.add('hidden');
-                clockButton.disabled = false;
-            }
-        };
-
-        window.showRegistration = function() {
-            dashboardDiv.classList.add('hidden');
-            registrationPageDiv.classList.remove('hidden');
-            startCamera();
-        };
-
         async function startCamera() {
             stopCamera();
             try {
@@ -256,45 +289,85 @@
             return imageData.split(',')[1]; // Return Base64 data without prefix
         }
 
-        window.handleFaceRegistration = async function() {
-            if (isProcessing) return;
-            isProcessing = true;
-            registerFaceSubmitBtn.disabled = true;
+        // Fungsi pendaftaran akaun baru
+        window.handleAccountRegistration = async function() {
+            const name = document.getElementById('registerNameInput').value;
+            const department = document.getElementById('registerDepartmentInput').value;
+            const email = document.getElementById('registerEmailInput').value;
+            const password = document.getElementById('registerPasswordInput').value;
 
-            const fullName = document.getElementById('fullNameInput').value;
-            const department = document.getElementById('departmentInput').value;
-            if (!fullName || !department) {
-                showStatusMessage('Sila isi nama dan jabatan.', 'error');
-                registerFaceSubmitBtn.disabled = false;
-                isProcessing = false;
+            if (!name || !department || !email || !password) {
+                showStatusMessage('Sila isi semua maklumat.', 'error');
                 return;
             }
 
-            showStatusMessage('Mengambil gambar wajah...', 'info');
-            
             try {
-                // Memberi sedikit masa untuk kamera bermula sebelum menangkap gambar
+                showStatusMessage('Mendaftar akaun...', 'info');
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                userId = userCredential.user.uid;
+                await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data'), {
+                    name: name,
+                    department: department,
+                    referenceImage: null
+                });
+                showStatusMessage('Pendaftaran akaun berjaya! Sila daftar wajah anda seterusnya.', 'success');
+                showPage('faceRegistrationPage');
+            } catch (error) {
+                showStatusMessage(`Gagal mendaftar: ${error.message}`, 'error');
+                console.error(error);
+            }
+        };
+
+        // Fungsi log masuk akaun
+        window.handleEmailLogin = async function() {
+            const email = document.getElementById('loginEmailInput').value;
+            const password = document.getElementById('loginPasswordInput').value;
+
+            if (!email || !password) {
+                showStatusMessage('Sila masukkan e-mel dan kata laluan.', 'error');
+                return;
+            }
+
+            try {
+                showStatusMessage('Log masuk...', 'info');
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                showStatusMessage(`Gagal log masuk: ${error.message}`, 'error');
+                console.error(error);
+            }
+        };
+
+        // Fungsi log keluar
+        window.handleSignOut = async function() {
+            await signOut(auth);
+            showStatusMessage('Anda telah log keluar.', 'success');
+            showPage('loginPage');
+        };
+
+        window.handleFaceRegistration = async function() {
+            if (isProcessing) return;
+            isProcessing = true;
+
+            showStatusMessage('Mengambil gambar wajah...', 'info');
+            await startCamera();
+
+            try {
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 const referenceImage = captureImage();
                 
                 const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
                 await setDoc(userDocRef, {
-                    name: fullName,
-                    department: department,
-                    referenceImage: referenceImage // Simpan gambar sebagai Base64 string
+                    referenceImage: referenceImage
                 }, { merge: true });
 
                 isFaceRegistered = true;
-                userData = { name: fullName, department: department };
-                showStatusMessage('Pendaftaran berjaya!', 'success');
-                
+                showStatusMessage('Pendaftaran wajah berjaya!', 'success');
             } catch (error) {
                 showStatusMessage('Gagal mendaftar wajah. Sila cuba lagi.', 'error');
                 console.error(error);
             } finally {
                 isProcessing = false;
-                registerFaceSubmitBtn.disabled = false;
-                window.showDashboard(); // Kembali ke dashboard
+                window.showPage('dashboard');
             }
         };
 
@@ -339,7 +412,6 @@
             await startCamera();
 
             try {
-                // Memberi sedikit masa untuk kamera bermula sebelum menangkap gambar
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 const liveImage = captureImage();
 
@@ -360,11 +432,10 @@
                 console.error(error);
             } finally {
                 isProcessing = false;
-                window.showDashboard(); // Kembali ke dashboard
+                window.showPage('dashboard');
             }
         };
         
-        // Logik utama Clock In/Out
         window.handleClockAction = async function() {
             showStatusMessage('Dapatkan lokasi...', 'info');
             try {
@@ -384,15 +455,7 @@
                 const docSnap = await getDoc(docRef);
                 const currentTime = new Date();
 
-                // Shifts
-                const shifts = [
-                    { start: { hour: 7, minute: 30 }, end: { hour: 16, minute: 30 } },
-                    { start: { hour: 8, minute: 0 }, end: { hour: 17, minute: 0 } },
-                    { start: { hour: 8, minute: 30 }, end: { hour: 17, minute: 30 } }
-                ];
-                
                 if (docSnap.exists() && docSnap.data().clockIn) {
-                    // Clock Out
                     const clockInTime = docSnap.data().clockIn.toDate();
                     const totalHours = (currentTime - clockInTime) / (1000 * 60 * 60);
                     
@@ -425,7 +488,6 @@
                     }, { merge: true });
                     showStatusMessage('Clock Out Berjaya!', 'success');
                 } else {
-                    // Clock In
                     const timeInToday = new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate(), currentTime.getHours(), currentTime.getMinutes());
                     const shift1Start = new Date(timeInToday.getFullYear(), timeInToday.getMonth(), timeInToday.getDate(), shifts[0].start.hour, shifts[0].start.minute);
                     const isClockInLate = timeInToday > shift1Start;
@@ -521,50 +583,65 @@
 
         // Inisialisasi
         window.onload = async function() {
-            await signInAnonymously(auth).catch(() => {
-                showStatusMessage('Gagal log masuk.', 'error');
-            });
-
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     userId = user.uid;
-                    userIdDisplay.textContent = `ID: ${userId}`;
-                    generateQRCode(userId);
-
                     const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
                     const userDocSnap = await getDoc(userDocRef);
+                    
                     if (userDocSnap.exists()) {
                         userData = userDocSnap.data();
                         userNameDisplay.textContent = `Selamat Datang, ${userData.name}`;
-                        if (userData.referenceImage) {
-                            isFaceRegistered = true;
+                        userIdDisplay.textContent = `ID: ${userId}`;
+                        generateQRCode(userId);
+                        isFaceRegistered = !!userData.referenceImage;
+                        
+                        const q = query(
+                            collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
+                            where('date', '>=', getStartOfMonth()),
+                            where('date', '<=', getEndOfMonth())
+                        );
+                        onSnapshot(q, (snapshot) => {
+                            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            updateAttendanceTable(data);
+                        });
+
+                        if (!isFaceRegistered) {
+                            showStatusMessage('Sila daftar wajah anda untuk menggunakan sistem.', 'info');
+                            showPage('faceRegistrationPage');
+                        } else {
+                            showPage('dashboard');
                         }
+
                     } else {
-                        userNameDisplay.textContent = 'Selamat Datang, Pengguna';
+                        // Jika user wujud tetapi data profil tiada, hantar ke pendaftaran muka
+                        showStatusMessage('Sila lengkapkan pendaftaran akaun anda dengan mendaftar wajah.', 'info');
+                        showPage('faceRegistrationPage');
                     }
-
-                    const q = query(
-                        collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
-                        where('date', '>=', getStartOfMonth()),
-                        where('date', '<=', getEndOfMonth())
-                    );
-                    onSnapshot(q, (snapshot) => {
-                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        updateAttendanceTable(data);
-                    });
-
-                    window.showDashboard();
+                } else {
+                    // Tiada pengguna log masuk, paparkan halaman log masuk
+                    showPage('loginPage');
                 }
             });
         };
 
         // Event Listeners
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('registerFaceBtn').addEventListener('click', window.showRegistration);
+            // Halaman Log Masuk
+            document.getElementById('loginBtn').addEventListener('click', window.handleEmailLogin);
+            document.getElementById('goToRegisterBtn').addEventListener('click', () => showPage('accountRegistrationPage'));
+
+            // Halaman Pendaftaran Akaun
+            document.getElementById('registerAccountBtn').addEventListener('click', window.handleAccountRegistration);
+            document.getElementById('backToLoginBtn').addEventListener('click', () => showPage('loginPage'));
+
+            // Halaman Pendaftaran Wajah
+            document.getElementById('registerFaceSubmitBtn').addEventListener('click', window.handleFaceRegistration);
+
+            // Dashboard
             document.getElementById('clockButton').addEventListener('click', window.handleFaceCheck);
             document.getElementById('generatePdfBtn').addEventListener('click', window.generatePDF);
-            document.getElementById('backToDashboardBtn').addEventListener('click', window.showDashboard);
-            document.getElementById('registerFaceSubmitBtn').addEventListener('click', window.handleFaceRegistration);
+            document.getElementById('signOutBtn').addEventListener('click', window.handleSignOut);
         });
     </script>
 </body>

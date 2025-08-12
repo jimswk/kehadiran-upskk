@@ -277,7 +277,7 @@
                 videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 videoElement.srcObject = videoStream;
             } catch (error) {
-                showStatusMessage('Akses kamera ditolak. Sila benarkan akses kamera.', 'error');
+                showStatusMessage('Gagal mengakses kamera. Sila berikan kebenaran.', 'error');
                 console.error(error);
             }
         }
@@ -288,7 +288,7 @@
             canvasElement.height = videoElement.videoHeight;
             context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
             const imageData = canvasElement.toDataURL('image/jpeg', 0.8);
-            return imageData.split(',')[1]; // Return Base64 data without prefix
+            return imageData.split(',')[1];
         }
 
         // Fungsi pendaftaran akaun baru
@@ -350,12 +350,10 @@
             if (isProcessing) return;
             isProcessing = true;
             registerFaceSubmitBtn.disabled = true;
-
             showStatusMessage('Memulakan kamera...', 'info');
             await startCamera();
 
             try {
-                // Tunggu 2 saat untuk kamera stabil sebelum mengambil gambar
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 showStatusMessage('Mengambil gambar wajah...', 'info');
                 const referenceImage = captureImage();

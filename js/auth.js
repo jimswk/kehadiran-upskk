@@ -15,6 +15,7 @@ document.getElementById('loginForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const name = document.getElementById('name').value.trim();
   const staffId = document.getElementById('staffId').value.trim();
+  const shift = document.getElementById('shift').value;
 
   if (!name || !staffId) {
     document.getElementById('loginError').style.display = 'block';
@@ -22,6 +23,6 @@ document.getElementById('loginForm').addEventListener('submit', (e) => {
     return;
   }
 
-  localStorage.setItem('user', JSON.stringify({ name, staffId }));
+  localStorage.setItem('user', JSON.stringify({ name, staffId, shift, department: 'UPSKK' }));
   window.location.href = 'dashboard.html';
 });

@@ -216,6 +216,7 @@
         const userNameDisplay = document.getElementById('userName');
         const userIdDisplay = document.getElementById('userIdDisplay');
         const clockButton = document.getElementById('clockButton');
+        const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
 
         window.jsPDF = window.jspdf.jsPDF;
 
@@ -276,7 +277,8 @@
                 videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 videoElement.srcObject = videoStream;
             } catch (error) {
-                showStatusMessage('Akses kamera ditolak.', 'error');
+                showStatusMessage('Akses kamera ditolak. Sila benarkan akses kamera.', 'error');
+                console.error(error);
             }
         }
 
@@ -347,12 +349,15 @@
         window.handleFaceRegistration = async function() {
             if (isProcessing) return;
             isProcessing = true;
+            registerFaceSubmitBtn.disabled = true;
 
-            showStatusMessage('Mengambil gambar wajah...', 'info');
+            showStatusMessage('Memulakan kamera...', 'info');
             await startCamera();
 
             try {
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Tunggu 2 saat untuk kamera stabil sebelum mengambil gambar
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                showStatusMessage('Mengambil gambar wajah...', 'info');
                 const referenceImage = captureImage();
                 
                 const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
@@ -367,6 +372,7 @@
                 console.error(error);
             } finally {
                 isProcessing = false;
+                registerFaceSubmitBtn.disabled = false;
                 window.showPage('dashboard');
             }
         };
@@ -412,7 +418,7 @@
             await startCamera();
 
             try {
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 const liveImage = captureImage();
 
                 const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
@@ -432,6 +438,7 @@
                 console.error(error);
             } finally {
                 isProcessing = false;
+                clockButton.disabled = false;
                 window.showPage('dashboard');
             }
         };
@@ -614,12 +621,10 @@
                         }
 
                     } else {
-                        // Jika user wujud tetapi data profil tiada, hantar ke pendaftaran muka
                         showStatusMessage('Sila lengkapkan pendaftaran akaun anda dengan mendaftar wajah.', 'info');
                         showPage('faceRegistrationPage');
                     }
                 } else {
-                    // Tiada pengguna log masuk, paparkan halaman log masuk
                     showPage('loginPage');
                 }
             });
@@ -627,18 +632,11 @@
 
         // Event Listeners
         document.addEventListener('DOMContentLoaded', () => {
-            // Halaman Log Masuk
             document.getElementById('loginBtn').addEventListener('click', window.handleEmailLogin);
             document.getElementById('goToRegisterBtn').addEventListener('click', () => showPage('accountRegistrationPage'));
-
-            // Halaman Pendaftaran Akaun
             document.getElementById('registerAccountBtn').addEventListener('click', window.handleAccountRegistration);
             document.getElementById('backToLoginBtn').addEventListener('click', () => showPage('loginPage'));
-
-            // Halaman Pendaftaran Wajah
             document.getElementById('registerFaceSubmitBtn').addEventListener('click', window.handleFaceRegistration);
-
-            // Dashboard
             document.getElementById('clockButton').addEventListener('click', window.handleFaceCheck);
             document.getElementById('generatePdfBtn').addEventListener('click', window.generatePDF);
             document.getElementById('signOutBtn').addEventListener('click', window.handleSignOut);
@@ -646,3 +644,4 @@
     </script>
 </body>
 </html>
+

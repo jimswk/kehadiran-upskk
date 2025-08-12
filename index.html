@@ -1,44 +1,632 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Attendance Recorder</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.0/build/qrcode.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Perakam Waktu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .message-box {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            text-align: center;
+        }
+        .message-box.info {
+            background-color: #e0f2fe;
+            color: #0369a1;
+        }
+        .message-box.error {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+        .message-box.success {
+            background-color: #dcfce7;
+            color: #15803d;
+        }
+        video {
+            border-radius: 0.5rem;
+            transform: scaleX(-1); /* Cermin video untuk pengalaman pengguna yang lebih baik */
+        }
+        .table-container {
+            overflow-x: auto;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        table {
+            min-width: 100%;
+        }
+    </style>
 </head>
 <body>
-  <h1>Attendance System</h1>
-  <div id="auth-section">
-    <input id="email" placeholder="Email" type="email">
-    <input id="password" placeholder="Password" type="password">
-    <input id="name" placeholder="Full Name">
-    <select id="shift">
-      <option value="7:30-16:30">7:30am - 4:30pm</option>
-      <option value="8:00-17:00">8:00am - 5:00pm</option>
-      <option value="8:30-17:30">8:30am - 5:30pm</option>
-    </select>
-    <button onclick="registerUser()">Register</button>
-    <button onclick="loginUser()">Login</button>
-  </div>
-  <div id="face-section" style="display:none;">
-    <video id="video" width="320" height="240" autoplay></video>
-    <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
-    <button onclick="registerFace()">Register Face</button>
-    <button onclick="clockInOut('in')">Clock In (Face)</button>
-    <button onclick="clockInOut('out')">Clock Out (Face)</button>
-    <button onclick="generateQR()">Generate QR for Alternative Check-In</button>
-    <div id="qr-container"></div>
-    <button onclick="scanQR()">Scan QR for Check-In/Out</button>
-    <button onclick="generateReport()">Generate Monthly Report PDF</button>
-  </div>
-  <script src="script.js"></script>
+    <div class="container bg-white rounded-lg shadow-lg">
+        <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">Sistem Perakam Waktu UPSKK</h1>
+
+        <!-- Mesej Status -->
+        <div id="statusMessage" class="message-box info hidden"></div>
+
+        <!-- Dashboard -->
+        <div id="dashboard" class="flex flex-col items-center">
+            <div id="user-info" class="text-center my-4">
+                <p class="text-xl font-medium text-gray-700" id="userName"></p>
+                <p class="text-sm text-gray-500" id="userIdDisplay"></p>
+            </div>
+
+            <div id="registrationWarning" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded-lg w-full">
+                <p class="font-bold">Perhatian</p>
+                <p>Sila daftarkan wajah anda untuk menggunakan fungsi pengecaman wajah.</p>
+                <button onclick="showRegistration()" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 transition-colors duration-200">
+                    Daftar Wajah Sekarang
+                </button>
+            </div>
+
+            <button id="clockButton" onclick="handleFaceCheck()" class="w-full max-w-sm py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                Clock In / Clock Out
+            </button>
+
+            <div class="my-8 w-full max-w-sm">
+                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">QR Code Check-in</h3>
+                <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-inner">
+                    <canvas id="qrCodeCanvas" class="border rounded-lg bg-white p-2"></canvas>
+                    <p class="mt-2 text-sm text-gray-500">Gunakan ini untuk Clock In/Out alternatif</p>
+                </div>
+            </div>
+
+            <div class="my-8 w-full">
+                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Laporan Kehadiran Bulanan</h3>
+                <button onclick="generatePDF()" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
+                    Jana Laporan PDF
+                </button>
+            </div>
+
+            <div class="my-8 w-full">
+                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Jadual Kehadiran Bulan Ini</h3>
+                <div class="table-container">
+                    <table class="bg-white divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weekday</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clock In</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clock Out</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Hours</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total OT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTableBody" class="bg-white divide-y divide-gray-200">
+                            <!-- Data kehadiran akan dimasukkan di sini oleh JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Halaman Pendaftaran Wajah -->
+        <div id="registrationPage" class="hidden flex flex-col items-center">
+            <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Pendaftaran Wajah</h2>
+            <p class="mb-4 text-center text-gray-600">Sila pastikan wajah anda berada di dalam bingkai kamera.</p>
+            <video id="videoElement" autoplay muted playsinline class="w-full max-w-sm h-auto rounded-lg mb-4 bg-gray-200"></video>
+            <canvas id="canvasElement" class="hidden"></canvas>
+            <button onclick="handleFaceRegistration()" class="w-full max-w-sm py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
+                Mula Daftar Wajah
+            </button>
+            <button onclick="showDashboard()" class="mt-4 text-blue-600 hover:underline">Kembali ke Dashboard</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Konfigurasi Firebase dari pengguna. Gunakan nilai ini.
+        const firebaseConfig = {
+            apiKey: "AIzaSyAB1Lqs-9EHLFI-pnMnKwyHYogNNQq7F8A",
+            authDomain: "kehadiran-upskk.firebaseapp.com",
+            projectId: "kehadiran-upskk",
+            storageBucket: "kehadiran-upskk.firebasestorage.app",
+            messagingSenderId: "705500257324",
+            appId: "1:705500257324:web:692f800a74a2f8c3d18589",
+            measurementId: "G-FKGN5NLLTK"
+        };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // Inisialisasi Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Koordinat pejabat dan toleransi dalam meter
+        const officeCoordinates = { latitude: 1.54287, longitude: 110.34752 };
+        const locationTolerance = 50; // 50 meter
+
+        // Waktu kerja yang ditetapkan
+        const shifts = [
+            { id: 'shift1', start: { hour: 7, minute: 30 }, end: { hour: 16, minute: 30 } },
+            { id: 'shift2', start: { hour: 8, minute: 0 }, end: { hour: 17, minute: 0 } },
+            { id: 'shift3', start: { hour: 8, minute: 30 }, end: { hour: 17, minute: 30 } }
+        ];
+
+        // Global variables
+        let userId = null;
+        let isFaceRegistered = false;
+        let userData = null;
+        let faceMatcher = null;
+        let videoStream = null;
+        let faceDetectionInterval = null;
+
+        // Elemen DOM
+        const dashboardDiv = document.getElementById('dashboard');
+        const registrationPageDiv = document.getElementById('registrationPage');
+        const statusMessageDiv = document.getElementById('statusMessage');
+        const registrationWarningDiv = document.getElementById('registrationWarning');
+        const videoElement = document.getElementById('videoElement');
+        const canvasElement = document.getElementById('canvasElement');
+        const attendanceTableBody = document.getElementById('attendanceTableBody');
+        const userNameDisplay = document.getElementById('userName');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const clockButton = document.getElementById('clockButton');
+
+        window.jsPDF = window.jspdf.jsPDF;
+
+        // Fungsi untuk mengira jarak antara dua koordinat (Haversine formula)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // metres
+            const φ1 = lat1 * Math.PI / 180; // φ, λ dalam radian
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c; // dalam meter
+        }
+
+        // Fungsi untuk memaparkan mesej status
+        function showStatusMessage(message, type = 'info') {
+            statusMessageDiv.textContent = message;
+            statusMessageDiv.className = `message-box ${type}`;
+            statusMessageDiv.classList.remove('hidden');
+        }
+
+        // Fungsi untuk menyembunyikan mesej status
+        function hideStatusMessage() {
+            statusMessageDiv.classList.add('hidden');
+        }
+
+        // Fungsi untuk menukar paparan antara dashboard dan halaman pendaftaran
+        function showDashboard() {
+            dashboardDiv.classList.remove('hidden');
+            registrationPageDiv.classList.add('hidden');
+            if (!isFaceRegistered) {
+                registrationWarningDiv.classList.remove('hidden');
+                clockButton.disabled = true;
+            } else {
+                registrationWarningDiv.classList.add('hidden');
+                clockButton.disabled = false;
+            }
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            if (faceDetectionInterval) {
+                clearInterval(faceDetectionInterval);
+            }
+        }
+
+        function showRegistration() {
+            dashboardDiv.classList.add('hidden');
+            registrationPageDiv.classList.remove('hidden');
+            startCamera();
+        }
+
+        // Load model Face-API.js
+        async function loadFaceModels() {
+            showStatusMessage('Memuatkan model pengecaman wajah...');
+            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/models';
+            try {
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.load(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.load(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.load(MODEL_URL)
+                ]);
+                showStatusMessage('Model pengecaman wajah berjaya dimuatkan.', 'success');
+                return true;
+            } catch (error) {
+                showStatusMessage('Gagal memuatkan model pengecaman wajah.', 'error');
+                console.error('Error loading face-api models:', error);
+                return false;
+            }
+        }
+
+        // Mulakan kamera
+        async function startCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+            }
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoElement.srcObject = videoStream;
+            } catch (error) {
+                showStatusMessage('Akses kamera ditolak. Sila benarkan akses kamera.', 'error');
+                console.error('Error accessing camera:', error);
+            }
+        }
+
+        // Pendaftaran Wajah
+        window.handleFaceRegistration = async function() {
+            if (!videoElement || !canvasElement) return;
+            showStatusMessage('Mendaftar wajah...');
+
+            if (videoStream) {
+                videoElement.play();
+                videoElement.addEventListener('play', async () => {
+                    const displaySize = { width: videoElement.width, height: videoElement.height };
+                    faceapi.matchDimensions(canvasElement, displaySize);
+
+                    const interval = setInterval(async () => {
+                        const detections = await faceapi.detectSingleFace(videoElement, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+                        if (detections) {
+                            clearInterval(interval);
+                            showStatusMessage('Wajah dikesan. Mendaftar...');
+                            const faceDescriptor = Array.from(detections.descriptor);
+                            const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
+                            await setDoc(userDocRef, {
+                                name: userData?.name || 'Pengguna Baru',
+                                department: userData?.department || 'Tiada',
+                                faceDescriptor: JSON.stringify(faceDescriptor),
+                            }, { merge: true });
+
+                            isFaceRegistered = true;
+                            createFaceMatcher(faceDescriptor);
+                            showStatusMessage('Pendaftaran wajah berjaya!', 'success');
+                            showDashboard();
+                        } else {
+                            showStatusMessage('Wajah tidak dikesan. Sila pastikan wajah anda berada di dalam bingkai.');
+                        }
+                    }, 1000);
+                }, { once: true });
+            }
+        };
+
+        // Cipta FaceMatcher
+        function createFaceMatcher(descriptor) {
+            const labeledDescriptors = [
+                new faceapi.LabeledFaceDescriptors(userId, [new Float32Array(JSON.parse(descriptor))])
+            ];
+            faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6); // 0.6 is the tolerance
+        }
+
+        // Pengecaman wajah untuk Clock In/Out
+        window.handleFaceCheck = async function() {
+            if (!videoElement || !canvasElement) return;
+            showStatusMessage('Memulakan pengecaman wajah...');
+
+            const modelsLoaded = await loadFaceModels();
+            if (!modelsLoaded) return;
+            
+            await startCamera();
+
+            videoElement.play();
+            videoElement.addEventListener('play', () => {
+                if (faceDetectionInterval) {
+                    clearInterval(faceDetectionInterval);
+                }
+                faceDetectionInterval = setInterval(async () => {
+                    const detections = await faceapi.detectSingleFace(videoElement, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+                    if (detections) {
+                        const match = faceMatcher.findBestMatch(detections.descriptor);
+                        if (match.label === userId) {
+                            clearInterval(faceDetectionInterval);
+                            showStatusMessage('Wajah sepadan! Melakukan tindakan clock...');
+                            handleClockAction();
+                            showDashboard();
+                        } else {
+                            showStatusMessage('Wajah tidak sepadan. Sila cuba lagi.', 'error');
+                        }
+                    } else {
+                        showStatusMessage('Wajah tidak dikesan. Sila pastikan wajah anda berada di dalam bingkai.');
+                    }
+                }, 1000);
+            }, { once: true });
+        };
+        
+        // Logik utama Clock In/Out
+        window.handleClockAction = async function(isQRCode = false) {
+            showStatusMessage('Mendapatkan lokasi anda...');
+            hideStatusMessage();
+            const docRef = doc(db, 'artifacts', appId, 'users', userId, 'attendance', getCurrentDate());
+
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
+                });
+                const userLatitude = position.coords.latitude;
+                const userLongitude = position.coords.longitude;
+
+                const distance = calculateDistance(
+                    userLatitude,
+                    userLongitude,
+                    officeCoordinates.latitude,
+                    officeCoordinates.longitude
+                );
+
+                if (distance > locationTolerance) {
+                    showStatusMessage(`Anda berada ${distance.toFixed(2)} meter dari pejabat. Gagal, sila pastikan anda berada di pejabat.`, 'error');
+                    return;
+                }
+                showStatusMessage('Lokasi disahkan. Menyimpan data...', 'info');
+
+                const docSnap = await getDoc(docRef);
+                const currentTime = new Date();
+                
+                if (docSnap.exists() && docSnap.data().clockIn) {
+                    // Clock Out
+                    const clockInTime = docSnap.data().clockIn.toDate();
+                    const totalMilliseconds = currentTime.getTime() - clockInTime.getTime();
+                    const totalHours = totalMilliseconds / (1000 * 60 * 60);
+
+                    // Tentukan shift berdasarkan masa clock-in
+                    const clockInHour = clockInTime.getHours();
+                    const clockInMinute = clockInTime.getMinutes();
+                    let matchedShift = null;
+                    let minTimeDiff = Infinity;
+
+                    shifts.forEach(shift => {
+                        const shiftStart = new Date();
+                        shiftStart.setHours(shift.start.hour, shift.start.minute, 0, 0);
+                        const timeDiff = Math.abs(clockInTime.getTime() - shiftStart.getTime());
+                        if (timeDiff < minTimeDiff) {
+                            minTimeDiff = timeDiff;
+                            matchedShift = shift;
+                        }
+                    });
+
+                    let otHours = 0;
+                    const clockOutTimeExpected = new Date();
+                    clockOutTimeExpected.setHours(matchedShift.end.hour, matchedShift.end.minute, 0, 0);
+
+                    if (currentTime > clockOutTimeExpected) {
+                        otHours = (currentTime - clockOutTimeExpected) / (1000 * 60 * 60);
+                    }
+
+                    const isClockOutEarly = currentTime < clockOutTimeExpected;
+
+                    await setDoc(docRef, {
+                        clockOut: currentTime,
+                        totalHours: totalHours,
+                        totalOT: otHours,
+                        locationOut: { lat: userLatitude, lng: userLongitude },
+                        isClockOutEarly: isClockOutEarly,
+                        matchedShift: matchedShift.id
+                    }, { merge: true });
+                    showStatusMessage('Clock Out Berjaya!', 'success');
+                } else {
+                    // Clock In
+                    let isClockInLate = false;
+                    const clockInTimeExpected = new Date();
+                    clockInTimeExpected.setHours(shifts[0].start.hour, shifts[0].start.minute, 0, 0);
+
+                    // Tentukan sama ada clock in lewat
+                    const timeInToday = new Date();
+                    timeInToday.setHours(currentTime.getHours(), currentTime.getMinutes());
+
+                    const shift1Start = new Date();
+                    shift1Start.setHours(shifts[0].start.hour, shifts[0].start.minute, 0, 0);
+
+                    const shift2Start = new Date();
+                    shift2Start.setHours(shifts[1].start.hour, shifts[1].start.minute, 0, 0);
+
+                    const shift3Start = new Date();
+                    shift3Start.setHours(shifts[2].start.hour, shifts[2].start.minute, 0, 0);
+
+                    if (currentTime > shift1Start) {
+                        isClockInLate = true;
+                    }
+
+                    await setDoc(docRef, {
+                        date: new Date(),
+                        weekday: new Date().toLocaleDateString('ms-MY', { weekday: 'long' }),
+                        clockIn: currentTime,
+                        locationIn: { lat: userLatitude, lng: userLongitude },
+                        isClockInLate: isClockInLate
+                    }, { merge: true });
+                    showStatusMessage('Clock In Berjaya!', 'success');
+                }
+            } catch (error) {
+                showStatusMessage('Gagal mendapatkan lokasi. Sila benarkan akses lokasi.', 'error');
+                console.error('Geolocation error:', error);
+            }
+        };
+
+        // Fungsi untuk menjana laporan PDF
+        window.generatePDF = async function() {
+            const startOfMonth = new Date();
+            startOfMonth.setDate(1);
+            startOfMonth.setHours(0, 0, 0, 0);
+            const endOfMonth = new Date();
+            endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+            endOfMonth.setDate(0);
+            endOfMonth.setHours(23, 59, 59, 999);
+
+            const q = query(
+                collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
+                where('date', '>=', startOfMonth),
+                where('date', '<=', endOfMonth)
+            );
+            
+            const querySnapshot = await getDocs(q);
+            const attendanceData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            const doc = new jsPDF('p', 'mm', 'a4');
+            doc.setFont('helvetica');
+            doc.setFontSize(14);
+            doc.text('Total Time Card', 14, 20);
+
+            const startOfMonthStr = startOfMonth.toISOString().slice(0, 10);
+            const endOfMonthStr = endOfMonth.toISOString().slice(0, 10);
+            doc.setFontSize(10);
+            doc.text(`Start Date ${startOfMonthStr} End Date ${endOfMonthStr}`, 14, 30);
+            // Updated to match the user's document format
+            doc.text(`First Name: ${userData?.name || 'Mohammad Azzer bin Taip'}, Department: ${userData?.department || 'UPSKK'}`, 14, 40);
+
+            // Header jadual
+            const headers = ["Tarikh", "Hari", "Waktu Masuk", "Waktu Keluar", "Jumlah Jam", "OT"];
+            let y = 50;
+            doc.setFontSize(8);
+            headers.forEach((header, index) => {
+                doc.text(header, 14 + (index * 30), y);
+            });
+
+            y += 10;
+            attendanceData.forEach(item => {
+                const date = item.date.toDate().toISOString().slice(0, 10);
+                const weekday = item.weekday;
+                const clockIn = item.clockIn ? item.clockIn.toDate().toLocaleTimeString('ms-MY') : '-';
+                const clockOut = item.clockOut ? item.clockOut.toDate().toLocaleTimeString('ms-MY') : '-';
+                const totalHours = item.totalHours ? item.totalHours.toFixed(2) : '-';
+                const totalOT = item.totalOT ? item.totalOT.toFixed(2) : '-';
+                
+                doc.text(date, 14, y);
+                doc.text(weekday, 44, y);
+                doc.text(clockIn, 74, y);
+                doc.text(clockOut, 104, y);
+                doc.text(totalHours, 134, y);
+                doc.text(totalOT, 164, y);
+                y += 5;
+            });
+
+            doc.save('Laporan_Kehadiran.pdf');
+        };
+
+        // Fungsi untuk mengemas kini jadual kehadiran secara automatik
+        function updateAttendanceTable(attendanceData) {
+            attendanceTableBody.innerHTML = '';
+            attendanceData.forEach(item => {
+                const row = document.createElement('tr');
+                const date = item.date.toDate().toISOString().slice(0, 10);
+                const weekday = item.weekday;
+                const clockInTime = item.clockIn ? item.clockIn.toDate().toLocaleTimeString('ms-MY') : '-';
+                const clockOutTime = item.clockOut ? item.clockOut.toDate().toLocaleTimeString('ms-MY') : '-';
+                const totalHours = item.totalHours ? item.totalHours.toFixed(2) : '-';
+                const totalOT = item.totalOT ? item.totalOT.toFixed(2) : '-';
+
+                const clockInClass = item.isClockInLate ? 'text-red-500 font-bold' : 'text-green-500 font-bold';
+                const clockOutClass = item.isClockOutEarly ? 'text-red-500 font-bold' : 'text-green-500 font-bold';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${weekday}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockInClass}">${clockInTime}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockOutClass}">${clockOutTime}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalHours}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalOT}</td>
+                `;
+                attendanceTableBody.appendChild(row);
+            });
+        }
+        
+        // Fungsi untuk menjana QR Code
+        function generateQRCode(data) {
+            const canvas = document.getElementById('qrCodeCanvas');
+            QRCode.toCanvas(canvas, data, function (error) {
+                if (error) console.error(error);
+            });
+        }
+
+        // Dapatkan tarikh semasa dalam format YYYY-MM-DD
+        function getCurrentDate() {
+            return new Date().toISOString().slice(0, 10);
+        }
+
+        // Dapatkan awal bulan
+        function getStartOfMonth() {
+            const date = new Date();
+            date.setDate(1);
+            date.setHours(0, 0, 0, 0);
+            return date;
+        }
+
+        // Dapatkan akhir bulan
+        function getEndOfMonth() {
+            const date = new Date();
+            date.setMonth(date.getMonth() + 1);
+            date.setDate(0);
+            date.setHours(23, 59, 59, 999);
+            return date;
+        }
+
+        // Inisialisasi aplikasi
+        window.onload = async function() {
+            // Autentikasi Firebase
+            try {
+                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (token) {
+                    await signInWithCustomToken(auth, token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Error signing in:", error);
+                await signInAnonymously(auth);
+            }
+
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    userIdDisplay.textContent = `ID Pengguna: ${userId}`;
+                    generateQRCode(userId);
+
+                    // Muat data pengguna
+                    const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
+                    const userDocSnap = await getDoc(userDocRef);
+                    if (userDocSnap.exists()) {
+                        userData = userDocSnap.data();
+                        userNameDisplay.textContent = `Selamat Datang, ${userData?.name || 'Pengguna'}`;
+                        if (userData.faceDescriptor) {
+                            isFaceRegistered = true;
+                            createFaceMatcher(userData.faceDescriptor);
+                            await loadFaceModels();
+                        }
+                    }
+
+                    // Muat data kehadiran bulanan secara real-time
+                    const q = query(
+                        collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
+                        where('date', '>=', getStartOfMonth()),
+                        where('date', '<=', getEndOfMonth())
+                    );
+                    onSnapshot(q, (snapshot) => {
+                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        updateAttendanceTable(data);
+                    });
+
+                    showDashboard();
+                } else {
+                    userId = null;
+                    userNameDisplay.textContent = 'Selamat Datang';
+                    userIdDisplay.textContent = '';
+                    showStatusMessage('Sila muat semula halaman untuk log masuk.', 'error');
+                }
+            });
+        };
+    </script>
 </body>
 </html>

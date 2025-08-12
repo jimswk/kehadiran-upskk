@@ -211,13 +211,17 @@
             statusMessageDiv.classList.add('hidden');
         }
 
-        window.showDashboard = function() {
-            dashboardDiv.classList.remove('hidden');
-            registrationPageDiv.classList.add('hidden');
-            if (videoStream) {
+        function stopCamera() {
+             if (videoStream) {
                 videoStream.getTracks().forEach(track => track.stop());
                 videoStream = null;
             }
+        }
+
+        window.showDashboard = function() {
+            dashboardDiv.classList.remove('hidden');
+            registrationPageDiv.classList.add('hidden');
+            stopCamera(); // Menghentikan kamera jika ada
             if (!isFaceRegistered) {
                 registrationWarningDiv.classList.remove('hidden');
                 clockButton.disabled = true;
@@ -234,7 +238,7 @@
         };
 
         async function startCamera() {
-            if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+            stopCamera();
             try {
                 videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 videoElement.srcObject = videoStream;
@@ -269,8 +273,8 @@
             showStatusMessage('Mengambil gambar wajah...', 'info');
             
             try {
-                // Tunggu video dimainkan sebelum mengambil gambar
-                await new Promise(resolve => videoElement.addEventListener('canplaythrough', resolve, { once: true }));
+                // Memberi sedikit masa untuk kamera bermula sebelum menangkap gambar
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 const referenceImage = captureImage();
                 
                 const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
@@ -283,19 +287,19 @@
                 isFaceRegistered = true;
                 userData = { name: fullName, department: department };
                 showStatusMessage('Pendaftaran berjaya!', 'success');
-                isProcessing = false;
-                window.showDashboard();
+                
             } catch (error) {
                 showStatusMessage('Gagal mendaftar wajah. Sila cuba lagi.', 'error');
                 console.error(error);
+            } finally {
                 isProcessing = false;
                 registerFaceSubmitBtn.disabled = false;
+                window.showDashboard(); // Kembali ke dashboard
             }
         };
 
         async function recognizeFaceWithGemini(referenceImage, liveImage) {
             const prompt = `Adakah muka dalam gambar 'live' sepadan dengan muka dalam gambar 'rujukan'? Jawab dengan 'match' atau 'no match' sahaja. Jangan berikan sebarang maklumat tambahan.`;
-            let chatHistory = [];
             
             const payload = {
                 contents: [{
@@ -335,8 +339,8 @@
             await startCamera();
 
             try {
-                // Tunggu video dimainkan sebelum mengambil gambar
-                await new Promise(resolve => videoElement.addEventListener('canplaythrough', resolve, { once: true }));
+                // Memberi sedikit masa untuk kamera bermula sebelum menangkap gambar
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 const liveImage = captureImage();
 
                 const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
@@ -532,7 +536,7 @@
                     if (userDocSnap.exists()) {
                         userData = userDocSnap.data();
                         userNameDisplay.textContent = `Selamat Datang, ${userData.name}`;
-                        if (userData.referenceImage) { // Check for referenceImage instead of faceDescriptor
+                        if (userData.referenceImage) {
                             isFaceRegistered = true;
                         }
                     } else {

@@ -8,9 +8,18 @@ window.onload = () => {
     return;
   }
   currentUser = JSON.parse(userStr);
-  document.getElementById('userInfo').textContent = `Hai, ${currentUser.name} (ID: ${currentUser.staffId})`;
+  document.getElementById('userInfo').textContent = `Hai, ${currentUser.name} (ID: ${currentUser.staffId}) | Shift: ${getShiftTime(currentUser.shift)}`;
   loadLogs();
 };
+
+function getShiftTime(shift) {
+  const times = {
+    "7:30": "7:30-4:30",
+    "8:00": "8:00-5:00",
+    "8:30": "8:30-5:30"
+  };
+  return times[shift] || "8:00-5:00";
+}
 
 function recordAttendance(type) {
   navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -46,30 +55,4 @@ function recordAttendance(type) {
 }
 
 async function loadLogs() {
-  const snapshot = await db.collection('attendance')
-    .where('staffId', '==', currentUser.staffId)
-    .orderBy('timestamp', 'desc')
-    .limit(30)
-    .get();
-
-  const logList = document.getElementById('logList');
-  logList.innerHTML = '';
-
-  snapshot.forEach(doc => {
-    const data = doc.data();
-    const li = document.createElement('li');
-    li.textContent = `[${data.type}] ${data.date} ${data.time} | ${data.distance}`;
-    logList.appendChild(li);
-  });
-}
-
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371e3;
-  const φ1 = lat1 * Math.PI / 180;
-  const φ2 = lat2 * Math.PI / 180;
-  const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
+  const snapshot = await

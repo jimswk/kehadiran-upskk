@@ -240,7 +240,7 @@
         // Load model Face-API.js
         async function loadFaceModels() {
             showStatusMessage('Memuatkan model pengecaman wajah...');
-            // UPDATED: Menggunakan URL CDN yang sah
+            // FIXED: Menggunakan URL CDN yang sah
             const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/weights';
             try {
                 await Promise.all([
@@ -251,7 +251,7 @@
                 showStatusMessage('Model pengecaman wajah berjaya dimuatkan.', 'success');
                 return true;
             } catch (error) {
-                showStatusMessage('Gagal memuatkan model pengecaman wajah.', 'error');
+                showStatusMessage('Gagal memuatkan model pengecaman wajah. Sila muat semula halaman dan cuba bersihkan cache pelayar anda.', 'error');
                 console.error('Error loading face-api models:', error);
                 return false;
             }
@@ -275,6 +275,9 @@
         window.handleFaceRegistration = async function() {
             if (!videoElement || !canvasElement) return;
             showStatusMessage('Mendaftar wajah...');
+            
+            const modelsLoaded = await loadFaceModels();
+            if (!modelsLoaded) return;
 
             if (videoStream) {
                 videoElement.play();
@@ -576,13 +579,6 @@
 
         // Inisialisasi aplikasi
         window.onload = async function() {
-            // UPDATED: Menambah komen untuk panduan ralat Firebase
-            /*
-             * Ralat 'auth/configuration-not-found' menunjukkan bahawa Firebase Authentication
-             * belum diaktifkan untuk projek ini. Sila pergi ke konsol Firebase anda,
-             * pilih projek ini, navigasi ke 'Authentication' dan aktifkan 'Anonymous'
-             * atau kaedah pengesahan lain yang anda inginkan.
-             */
             try {
                 const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
                 if (token) {
@@ -592,9 +588,7 @@
                 }
             } catch (error) {
                 console.error("Error signing in:", error);
-                // Menambah mesej yang lebih jelas untuk pengguna
                 showStatusMessage("Gagal log masuk. Sila sahkan konfigurasi Firebase Authentication anda.", 'error');
-                // Pilihan untuk cuba lagi secara anonim jika ralat bukan disebabkan oleh konfigurasi
                 await signInAnonymously(auth).catch(e => console.error("Anonymous sign-in failed:", e));
             }
 
@@ -613,8 +607,11 @@
                         if (userData.faceDescriptor) {
                             isFaceRegistered = true;
                             createFaceMatcher(userData.faceDescriptor);
-                            // Models are now loaded only when needed for performance
                         }
+                    } else {
+                         // FIXED: Pastikan userData tidak null jika profil tidak wujud
+                        userData = { name: 'Pengguna', department: 'Tiada' };
+                        userNameDisplay.textContent = `Selamat Datang, ${userData.name}`;
                     }
 
                     // Muat data kehadiran bulanan secara real-time

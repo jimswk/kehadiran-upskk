@@ -68,12 +68,12 @@
             <div id="registrationWarning" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded-lg w-full">
                 <p class="font-bold">Perhatian</p>
                 <p>Sila daftarkan wajah anda untuk menggunakan fungsi pengecaman wajah.</p>
-                <button onclick="showRegistration()" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 transition-colors duration-200">
+                <button onclick="window.showRegistration()" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 transition-colors duration-200">
                     Daftar Wajah Sekarang
                 </button>
             </div>
 
-            <button id="clockButton" onclick="handleFaceCheck()" class="w-full max-w-sm py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button id="clockButton" onclick="window.handleFaceCheck()" class="w-full max-w-sm py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                 Clock In / Clock Out
             </button>
 
@@ -87,9 +87,8 @@
 
             <div class="my-8 w-full">
                 <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Laporan Kehadiran Bulanan</h3>
-                <button onclick="generatePDF()" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
-                    Jana Laporan PDF
-                </button>
+                <button onclick="window.generatePDF()" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
+                    Jana Laporan PDF</button>
             </div>
 
             <div class="my-8 w-full">
@@ -115,15 +114,25 @@
         </div>
 
         <!-- Halaman Pendaftaran Wajah -->
-        <div id="registrationPage" class="hidden flex flex-col items-center">
+        <div id="registrationPage" class="hidden flex flex-col items-center p-4">
             <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Pendaftaran Wajah</h2>
-            <p class="mb-4 text-center text-gray-600">Sila pastikan wajah anda berada di dalam bingkai kamera.</p>
-            <video id="videoElement" autoplay muted playsinline class="w-full max-w-sm h-auto rounded-lg mb-4 bg-gray-200"></video>
-            <canvas id="canvasElement" class="hidden"></canvas>
-            <button onclick="handleFaceRegistration()" class="w-full max-w-sm py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
-                Mula Daftar Wajah
-            </button>
-            <button onclick="showDashboard()" class="mt-4 text-blue-600 hover:underline">Kembali ke Dashboard</button>
+            <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
+                <p class="mb-4 text-center text-gray-600">Sila masukkan maklumat anda dan pastikan wajah anda berada di dalam bingkai kamera.</p>
+                <div class="mb-4">
+                    <label for="fullNameInput" class="block text-sm font-medium text-gray-700">Nama Penuh</label>
+                    <input type="text" id="fullNameInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Nama Penuh Anda">
+                </div>
+                <div class="mb-4">
+                    <label for="departmentInput" class="block text-sm font-medium text-gray-700">Jabatan</label>
+                    <input type="text" id="departmentInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Nama Jabatan Anda">
+                </div>
+                <video id="videoElement" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
+                <canvas id="canvasElement" class="hidden"></canvas>
+                <button onclick="window.handleFaceRegistration()" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
+                    Mula Daftar Wajah
+                </button>
+                <button onclick="window.showDashboard()" class="mt-4 text-blue-600 hover:underline">Kembali ke Dashboard</button>
+            </div>
         </div>
     </div>
 
@@ -212,7 +221,7 @@
         }
 
         // Fungsi untuk menukar paparan antara dashboard dan halaman pendaftaran
-        function showDashboard() {
+        window.showDashboard = function() {
             dashboardDiv.classList.remove('hidden');
             registrationPageDiv.classList.add('hidden');
             if (!isFaceRegistered) {
@@ -231,7 +240,7 @@
             }
         }
 
-        function showRegistration() {
+        window.showRegistration = function() {
             dashboardDiv.classList.add('hidden');
             registrationPageDiv.classList.remove('hidden');
             startCamera();
@@ -240,7 +249,6 @@
         // Load model Face-API.js
         async function loadFaceModels() {
             showStatusMessage('Memuatkan model pengecaman wajah...');
-            // FIXED: Menggunakan URL CDN yang sah
             const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/weights';
             try {
                 await Promise.all([
@@ -274,6 +282,14 @@
         // Pendaftaran Wajah
         window.handleFaceRegistration = async function() {
             if (!videoElement || !canvasElement) return;
+
+            const fullName = document.getElementById('fullNameInput').value;
+            const department = document.getElementById('departmentInput').value;
+            if (!fullName || !department) {
+                showStatusMessage('Sila masukkan nama penuh dan jabatan anda.', 'error');
+                return;
+            }
+
             showStatusMessage('Mendaftar wajah...');
             
             const modelsLoaded = await loadFaceModels();
@@ -293,15 +309,16 @@
                             const faceDescriptor = Array.from(detections.descriptor);
                             const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
                             await setDoc(userDocRef, {
-                                name: userData?.name || 'Pengguna Baru',
-                                department: userData?.department || 'Tiada',
+                                name: fullName,
+                                department: department,
                                 faceDescriptor: JSON.stringify(faceDescriptor),
                             }, { merge: true });
 
                             isFaceRegistered = true;
+                            userData = { name: fullName, department: department };
                             createFaceMatcher(faceDescriptor);
                             showStatusMessage('Pendaftaran wajah berjaya!', 'success');
-                            showDashboard();
+                            window.showDashboard();
                         } else {
                             showStatusMessage('Wajah tidak dikesan. Sila pastikan wajah anda berada di dalam bingkai.');
                         }
@@ -341,7 +358,7 @@
                             clearInterval(faceDetectionInterval);
                             showStatusMessage('Wajah sepadan! Melakukan tindakan clock...');
                             handleClockAction();
-                            showDashboard();
+                            window.showDashboard();
                         } else {
                             showStatusMessage('Wajah tidak sepadan. Sila cuba lagi.', 'error');
                         }
@@ -609,7 +626,6 @@
                             createFaceMatcher(userData.faceDescriptor);
                         }
                     } else {
-                         // FIXED: Pastikan userData tidak null jika profil tidak wujud
                         userData = { name: 'Pengguna', department: 'Tiada' };
                         userNameDisplay.textContent = `Selamat Datang, ${userData.name}`;
                     }

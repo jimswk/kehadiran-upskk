@@ -10,8 +10,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- QR Code -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-    <!-- face-api.js -->
-    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         body {
@@ -172,10 +170,8 @@
         let userId = null;
         let isFaceRegistered = false;
         let userData = null;
-        let faceMatcher = null;
         let videoStream = null;
-        let faceDetectionInterval = null;
-        let modelsLoaded = false; // Status muatan model
+        let isProcessing = false;
 
         // DOM Elements
         const dashboardDiv = document.getElementById('dashboard');
@@ -188,12 +184,10 @@
         const userNameDisplay = document.getElementById('userName');
         const userIdDisplay = document.getElementById('userIdDisplay');
         const clockButton = document.getElementById('clockButton');
+        const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
 
         // Pastikan jsPDF tersedia
         window.jsPDF = window.jspdf.jsPDF;
-
-        // URL model face-api.js dari GitHub
-        const MODEL_URL = 'https://raw.githubusercontent.com/jimswk/kehadiran-upskk/main/weights';
 
         // Fungsi: Kira jarak (Haversine)
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -224,9 +218,6 @@
                 videoStream.getTracks().forEach(track => track.stop());
                 videoStream = null;
             }
-            if (faceDetectionInterval) {
-                clearInterval(faceDetectionInterval);
-            }
             if (!isFaceRegistered) {
                 registrationWarningDiv.classList.remove('hidden');
                 clockButton.disabled = true;
@@ -242,28 +233,6 @@
             startCamera();
         };
 
-        // Muat model face-api.js
-        async function loadFaceModels() {
-            if (modelsLoaded) {
-                return true;
-            }
-            showStatusMessage('Memuatkan model wajah...');
-            try {
-                await Promise.all([
-                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-                ]);
-                modelsLoaded = true;
-                showStatusMessage('Model berjaya dimuatkan.', 'success');
-                return true;
-            } catch (error) {
-                showStatusMessage('Gagal muat model. Pastikan folder /weights betul.', 'error');
-                console.error('Model load error:', error);
-                return false;
-            }
-        }
-
         async function startCamera() {
             if (videoStream) videoStream.getTracks().forEach(t => t.stop());
             try {
@@ -274,89 +243,126 @@
             }
         }
 
+        function captureImage() {
+            const context = canvasElement.getContext('2d');
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+            const imageData = canvasElement.toDataURL('image/jpeg', 0.8);
+            return imageData.split(',')[1]; // Return Base64 data without prefix
+        }
+
         window.handleFaceRegistration = async function() {
+            if (isProcessing) return;
+            isProcessing = true;
+            registerFaceSubmitBtn.disabled = true;
+
             const fullName = document.getElementById('fullNameInput').value;
             const department = document.getElementById('departmentInput').value;
             if (!fullName || !department) {
                 showStatusMessage('Sila isi nama dan jabatan.', 'error');
+                registerFaceSubmitBtn.disabled = false;
+                isProcessing = false;
                 return;
             }
 
-            if (!modelsLoaded) {
-                showStatusMessage('Model sedang dimuatkan, sila tunggu sebentar.', 'info');
-                return;
+            showStatusMessage('Mengambil gambar wajah...', 'info');
+            
+            try {
+                // Tunggu video dimainkan sebelum mengambil gambar
+                await new Promise(resolve => videoElement.addEventListener('canplaythrough', resolve, { once: true }));
+                const referenceImage = captureImage();
+                
+                const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
+                await setDoc(userDocRef, {
+                    name: fullName,
+                    department: department,
+                    referenceImage: referenceImage // Simpan gambar sebagai Base64 string
+                }, { merge: true });
+
+                isFaceRegistered = true;
+                userData = { name: fullName, department: department };
+                showStatusMessage('Pendaftaran berjaya!', 'success');
+                isProcessing = false;
+                window.showDashboard();
+            } catch (error) {
+                showStatusMessage('Gagal mendaftar wajah. Sila cuba lagi.', 'error');
+                console.error(error);
+                isProcessing = false;
+                registerFaceSubmitBtn.disabled = false;
             }
-
-            showStatusMessage('Mengesan wajah...');
-            videoElement.play();
-            videoElement.addEventListener('play', async () => {
-                const displaySize = { width: videoElement.width, height: videoElement.height };
-                faceapi.matchDimensions(canvasElement, displaySize);
-
-                const interval = setInterval(async () => {
-                    const detections = await faceapi.detectSingleFace(videoElement, new faceapi.TinyFaceDetectorOptions())
-                        .withFaceLandmarks().withFaceDescriptor();
-                    if (detections) {
-                        clearInterval(interval);
-                        const faceDescriptor = Array.from(detections.descriptor);
-                        const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
-                        await setDoc(userDocRef, {
-                            name: fullName,
-                            department: department,
-                            faceDescriptor: JSON.stringify(faceDescriptor)
-                        }, { merge: true });
-
-                        isFaceRegistered = true;
-                        userData = { name: fullName, department: department };
-                        createFaceMatcher(faceDescriptor);
-                        showStatusMessage('Pendaftaran berjaya!', 'success');
-                        window.showDashboard();
-                    } else {
-                        showStatusMessage('Wajah tidak dikesan. Cuba lagi.');
-                    }
-                }, 1000);
-            }, { once: true });
         };
 
-        function createFaceMatcher(descriptor) {
-            const labeledDescriptors = [
-                new faceapi.LabeledFaceDescriptors(userId, [new Float32Array(JSON.parse(descriptor))])
-            ];
-            faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
+        async function recognizeFaceWithGemini(referenceImage, liveImage) {
+            const prompt = `Adakah muka dalam gambar 'live' sepadan dengan muka dalam gambar 'rujukan'? Jawab dengan 'match' atau 'no match' sahaja. Jangan berikan sebarang maklumat tambahan.`;
+            let chatHistory = [];
+            
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: prompt },
+                        { inlineData: { mimeType: "image/jpeg", data: referenceImage } },
+                        { inlineData: { mimeType: "image/jpeg", data: liveImage } }
+                    ]
+                }],
+            };
+
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                
+                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                return text?.toLowerCase().trim() === 'match';
+            } catch (error) {
+                console.error("Gemini API call failed:", error);
+                return false;
+            }
         }
 
         window.handleFaceCheck = async function() {
-            if (!modelsLoaded) {
-                showStatusMessage('Model sedang dimuatkan, sila tunggu sebentar.', 'info');
-                return;
-            }
-            showStatusMessage('Mengesan wajah...');
+            if (isProcessing) return;
+            isProcessing = true;
+            clockButton.disabled = true;
+
+            showStatusMessage('Mengambil gambar dan membandingkan wajah...', 'info');
             await startCamera();
 
-            videoElement.play();
-            videoElement.addEventListener('play', () => {
-                if (faceDetectionInterval) clearInterval(faceDetectionInterval);
-                faceDetectionInterval = setInterval(async () => {
-                    const detections = await faceapi.detectSingleFace(videoElement, new faceapi.TinyFaceDetectorOptions())
-                        .withFaceLandmarks().withFaceDescriptor();
-                    if (detections) {
-                        const match = faceMatcher.findBestMatch(detections.descriptor);
-                        if (match.label === userId) {
-                            clearInterval(faceDetectionInterval);
-                            showStatusMessage('Wajah sepadan! Clock In/Out...', 'success');
-                            window.handleClockAction();
-                        } else {
-                            showStatusMessage('Wajah tidak sepadan.', 'error');
-                        }
-                    } else {
-                        showStatusMessage('Wajah tidak dikesan.');
-                    }
-                }, 1000);
-            }, { once: true });
-        };
+            try {
+                // Tunggu video dimainkan sebelum mengambil gambar
+                await new Promise(resolve => videoElement.addEventListener('canplaythrough', resolve, { once: true }));
+                const liveImage = captureImage();
 
+                const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
+                const userDocSnap = await getDoc(userDocRef);
+                const referenceImage = userDocSnap.data().referenceImage;
+                
+                const isMatch = await recognizeFaceWithGemini(referenceImage, liveImage);
+
+                if (isMatch) {
+                    showStatusMessage('Wajah sepadan! Melakukan tindakan clock...', 'success');
+                    await window.handleClockAction();
+                } else {
+                    showStatusMessage('Wajah tidak sepadan. Sila cuba lagi.', 'error');
+                }
+            } catch (error) {
+                showStatusMessage('Gagal mengesan wajah. Sila cuba lagi.', 'error');
+                console.error(error);
+            } finally {
+                isProcessing = false;
+                window.showDashboard(); // Kembali ke dashboard
+            }
+        };
+        
+        // Logik utama Clock In/Out
         window.handleClockAction = async function() {
-            showStatusMessage('Dapatkan lokasi...');
+            showStatusMessage('Dapatkan lokasi...', 'info');
             try {
                 const position = await new Promise((resolve, reject) => {
                     navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
@@ -374,20 +380,21 @@
                 const docSnap = await getDoc(docRef);
                 const currentTime = new Date();
 
-                // Logic to determine shift and OT
-                let isClockInLate = false;
-                let isClockOutEarly = false;
-                let totalHours = 0;
-                let totalOT = 0;
-                let matchedShift = shifts[0];
-
+                // Shifts
+                const shifts = [
+                    { start: { hour: 7, minute: 30 }, end: { hour: 16, minute: 30 } },
+                    { start: { hour: 8, minute: 0 }, end: { hour: 17, minute: 0 } },
+                    { start: { hour: 8, minute: 30 }, end: { hour: 17, minute: 30 } }
+                ];
+                
                 if (docSnap.exists() && docSnap.data().clockIn) {
                     // Clock Out
                     const clockInTime = docSnap.data().clockIn.toDate();
-                    totalHours = (currentTime - clockInTime) / (1000 * 60 * 60);
+                    const totalHours = (currentTime - clockInTime) / (1000 * 60 * 60);
                     
                     const timeInToday = new Date(clockInTime.getFullYear(), clockInTime.getMonth(), clockInTime.getDate(), clockInTime.getHours(), clockInTime.getMinutes());
                     let minTimeDiff = Infinity;
+                    let matchedShift = shifts[0];
                     shifts.forEach(shift => {
                         const shiftStart = new Date(timeInToday.getFullYear(), timeInToday.getMonth(), timeInToday.getDate(), shift.start.hour, shift.start.minute);
                         const timeDiff = Math.abs(timeInToday.getTime() - shiftStart.getTime());
@@ -398,8 +405,8 @@
                     });
 
                     const clockOutTimeExpected = new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate(), matchedShift.end.hour, matchedShift.end.minute);
-                    isClockOutEarly = currentTime < clockOutTimeExpected;
-
+                    const isClockOutEarly = currentTime < clockOutTimeExpected;
+                    let totalOT = 0;
                     if (currentTime > clockOutTimeExpected) {
                         totalOT = (currentTime - clockOutTimeExpected) / (1000 * 60 * 60);
                     }
@@ -417,10 +424,7 @@
                     // Clock In
                     const timeInToday = new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate(), currentTime.getHours(), currentTime.getMinutes());
                     const shift1Start = new Date(timeInToday.getFullYear(), timeInToday.getMonth(), timeInToday.getDate(), shifts[0].start.hour, shifts[0].start.minute);
-                    
-                    if (timeInToday > shift1Start) {
-                        isClockInLate = true;
-                    }
+                    const isClockInLate = timeInToday > shift1Start;
 
                     await setDoc(docRef, {
                         date: currentTime,
@@ -433,6 +437,7 @@
                 }
             } catch (error) {
                 showStatusMessage('Gagal akses lokasi.', 'error');
+                console.error(error);
             }
         };
 
@@ -512,9 +517,6 @@
 
         // Inisialisasi
         window.onload = async function() {
-            // Memuat model di latar belakang untuk masa respons yang lebih baik
-            loadFaceModels();
-
             await signInAnonymously(auth).catch(() => {
                 showStatusMessage('Gagal log masuk.', 'error');
             });
@@ -530,9 +532,8 @@
                     if (userDocSnap.exists()) {
                         userData = userDocSnap.data();
                         userNameDisplay.textContent = `Selamat Datang, ${userData.name}`;
-                        if (userData.faceDescriptor) {
+                        if (userData.referenceImage) { // Check for referenceImage instead of faceDescriptor
                             isFaceRegistered = true;
-                            createFaceMatcher(userData.faceDescriptor);
                         }
                     } else {
                         userNameDisplay.textContent = 'Selamat Datang, Pengguna';

@@ -3,30 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login - Kehadiran UPSKK</title>
+  <title>Daftar Muka - UPSKK</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <div class="login-container">
-    <h1>🔐 Login Kehadiran</h1>
-    <p>Sila log masuk untuk rekod kehadiran</p>
+  <div class="container">
+    <h1>📸 Daftar Muka</h1>
+    <p>Sila isi nama dan daftar muka anda</p>
 
-    <form id="loginForm">
-      <input type="text" id="name" placeholder="Nama Penuh" value="Mohammad Azzer bin Taip" required />
-      <input type="text" id="staffId" placeholder="ID Kakitangan" value="UPSKK001" required />
-      <label for="shift">Shift:</label>
-      <select id="shift" required>
-        <option value="7:30">7:30 AM - 4:30 PM</option>
-        <option value="8:00">8:00 AM - 5:00 PM</option>
-        <option value="8:30">8:30 AM - 5:30 PM</option>
-      </select>
-      <button type="submit">Log Masuk</button>
-    </form>
-    <p id="loginError" style="color: red; display: none;"></p>
+    <input type="text" id="name" placeholder="Nama Penuh" required />
+    <p><strong>ID Anda:</strong> <span id="autoId">Auto-generated</span></p>
+
+    <p id="status">Memuat model muka...</p>
+    <video id="video" width="640" height="480" autoplay muted></video>
+    <canvas id="overlay" width="640" height="480"></canvas>
+
+    <button id="registerBtn" disabled>✅ Daftar Muka</button>
+    <p><a href="dashboard.html">➡️ Terus ke Dashboard</a></p>
   </div>
 
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-  <script src="js/auth.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAB1Lqs-9EHLFI-pnMnKwyHYogNNQq7F8A",
+      authDomain: "kehadiran-upskk.firebaseapp.com",
+      projectId: "kehadiran-upskk",
+      storageBucket: "kehadiran-upskk.firebasestorage.app",
+      messagingSenderId: "705500257324",
+      appId: "1:705500257324:web:692f800a74a2f8c3d18589",
+      measurementId: "G-FKGN5NLLTK"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+  <script src="js/register.js"></script>
 </body>
 </html>

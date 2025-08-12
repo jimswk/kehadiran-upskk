@@ -136,7 +136,7 @@
             
             <div id="scanModeContainer" class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
                 <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Clock In/Out</h3>
-                <div id="faceScanMode" class="">
+                <div id="faceScanMode">
                     <p class="mb-4 text-center text-gray-600">Imbas wajah anda untuk Clock In/Out.</p>
                     <div class="relative">
                         <video id="scanVideoElement" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
@@ -260,6 +260,7 @@
         const switchToFaceBtn = document.getElementById('switchToFaceBtn');
         const downloadQrBtn = document.getElementById('downloadQrBtn');
         const toggleCameraBtn = document.getElementById('toggleCameraBtn');
+        const qrUploadInput = document.getElementById('qrUploadInput');
 
 
         window.jsPDF = window.jspdf.jsPDF;
@@ -353,7 +354,6 @@
             }
         }
 
-
         function captureImage(videoEl) {
             const context = canvasElement.getContext('2d');
             canvasElement.width = videoEl.videoWidth;
@@ -421,7 +421,7 @@
         window.handleFaceRegistration = async function() {
             if (isProcessing) return;
             isProcessing = true;
-            document.getElementById('registerFaceSubmitBtn').disabled = true;
+            registerFaceSubmitBtn.disabled = true;
             showStatusMessage('Memulakan kamera...', 'info');
             await startCamera(videoElement);
 
@@ -430,9 +430,9 @@
                 showStatusMessage('Mengambil gambar wajah dari pelbagai sudut...', 'info');
                 
                 const referenceImages = [];
-                for (let i = 0; i < 5; i++) { // Ambil 5 imej
+                for (let i = 0; i < 5; i++) {
                     referenceImages.push(captureImage(videoElement));
-                    await new Promise(resolve => setTimeout(resolve, 500)); // Jeda 0.5s
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
                 
                 const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
@@ -447,8 +447,8 @@
                 console.error(error);
             } finally {
                 isProcessing = false;
-                document.getElementById('registerFaceSubmitBtn').disabled = false;
-                window.showPage('loginPage'); // Kembali ke login setelah pendaftaran
+                registerFaceSubmitBtn.disabled = false;
+                window.showPage('loginPage');
             }
         };
 
@@ -462,7 +462,6 @@
             parts.push({ inlineData: { mimeType: "image/jpeg", data: liveImage } });
 
             const payload = { contents: [{ parts: parts }] };
-
             const apiKey = "";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
@@ -505,18 +504,56 @@
                     await window.handleClockAction();
                 } else {
                     showStatusMessage('Wajah tidak sepadan. Sila cuba lagi.', 'error');
-                    switchToQrBtn.click(); // Switch to QR mode if face scan fails
                 }
             } catch (error) {
                 showStatusMessage('Gagal mengesan wajah. Sila cuba lagi.', 'error');
                 console.error(error);
-                switchToQrBtn.click(); // Switch to QR mode if an error occurs
             } finally {
                 isProcessing = false;
                 faceScanBtn.disabled = false;
-                // stopCamera(); // Let camera run for face scan mode
             }
         };
+
+        window.switchToQrScanMode = function() {
+            faceScanModeDiv.classList.add('hidden');
+            qrScanModeDiv.classList.remove('hidden');
+            listCameras();
+            startQrScan();
+            showStatusMessage('Sedia untuk imbas QR code.', 'info');
+        };
+
+        window.switchToFaceScanMode = function() {
+            faceScanModeDiv.classList.remove('hidden');
+            qrScanModeDiv.classList.add('hidden');
+            stopCamera();
+            hideStatusMessage();
+        };
+
+        async function startQrScan() {
+            await startCamera(qrScannerVideo);
+            const qrContext = qrCanvas.getContext('2d');
+            qrScannerInterval = setInterval(() => {
+                if (qrScannerVideo.readyState === qrScannerVideo.HAVE_ENOUGH_DATA) {
+                    qrCanvas.height = qrScannerVideo.videoHeight;
+                    qrCanvas.width = qrScannerVideo.videoWidth;
+                    qrContext.drawImage(qrScannerVideo, 0, 0, qrCanvas.width, qrCanvas.height);
+                    const imageData = qrContext.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+                    
+                    if (code) {
+                        clearInterval(qrScannerInterval);
+                        stopCamera();
+                        const scannedData = code.data;
+                        if (scannedData === userId) {
+                           showStatusMessage('QR Code sepadan. Melakukan tindakan clock...', 'success');
+                           window.handleClockAction();
+                        } else {
+                            showStatusMessage('QR Code tidak sepadan.', 'error');
+                        }
+                    }
+                }
+            }, 1000/30);
+        }
         
         window.handleClockAction = async function() {
             showStatusMessage('Dapatkan lokasi...', 'info');
@@ -673,7 +710,6 @@
             reader.onload = async function() {
                 const imageData = reader.result;
                 
-                // Decode QR code from the uploaded image
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
@@ -762,13 +798,27 @@
             document.getElementById('returnToLoginBtn').addEventListener('click', () => showPage('loginPage'));
 
             // Dashboard
-            document.getElementById('faceScanBtn').addEventListener('click', window.handleFaceCheck);
-            document.getElementById('switchToQrBtn').addEventListener('click', window.switchToQrScanMode);
-            document.getElementById('switchToFaceBtn').addEventListener('click', window.switchToFaceScanMode);
-            document.getElementById('generatePdfBtn').addEventListener('click', window.generatePDF);
-            document.getElementById('signOutBtn').addEventListener('click', window.handleSignOut);
-            document.getElementById('qrUploadInput').addEventListener('change', handleQrUpload);
-            document.getElementById('toggleCameraBtn').addEventListener('click', window.toggleCamera);
+            if (document.getElementById('faceScanBtn')) {
+                document.getElementById('faceScanBtn').addEventListener('click', window.handleFaceCheck);
+            }
+            if (document.getElementById('switchToQrBtn')) {
+                document.getElementById('switchToQrBtn').addEventListener('click', window.switchToQrScanMode);
+            }
+            if (document.getElementById('switchToFaceBtn')) {
+                document.getElementById('switchToFaceBtn').addEventListener('click', window.switchToFaceScanMode);
+            }
+            if (document.getElementById('generatePdfBtn')) {
+                document.getElementById('generatePdfBtn').addEventListener('click', window.generatePDF);
+            }
+            if (document.getElementById('signOutBtn')) {
+                document.getElementById('signOutBtn').addEventListener('click', window.handleSignOut);
+            }
+            if (document.getElementById('qrUploadInput')) {
+                document.getElementById('qrUploadInput').addEventListener('change', handleQrUpload);
+            }
+            if (document.getElementById('toggleCameraBtn')) {
+                document.getElementById('toggleCameraBtn').addEventListener('click', window.toggleCamera);
+            }
         });
     </script>
 </body>

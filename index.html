@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aplikasi Perakam Waktu</title>
+    <title>Sistem Perakam Waktu UPSKK</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- QR Code -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <!-- face-api.js -->
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
@@ -67,7 +71,7 @@
                 <p class="text-sm text-gray-500" id="userIdDisplay"></p>
             </div>
 
-            <div id="registrationWarning" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded-lg w-full">
+            <div id="registrationWarning" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded-lg w-full">
                 <p class="font-bold">Perhatian</p>
                 <p>Sila daftarkan wajah anda untuk menggunakan fungsi pengecaman wajah.</p>
                 <button id="registerFaceBtn" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 transition-colors duration-200">
@@ -100,12 +104,12 @@
                     <table class="bg-white divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weekday</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clock In</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clock Out</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Hours</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total OT</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarikh</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hari</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Masuk</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keluar</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jam</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">OT</th>
                             </tr>
                         </thead>
                         <tbody id="attendanceTableBody" class="bg-white divide-y divide-gray-200">
@@ -119,14 +123,14 @@
         <div id="registrationPage" class="hidden flex flex-col items-center p-4">
             <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Pendaftaran Wajah</h2>
             <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
-                <p class="mb-4 text-center text-gray-600">Sila masukkan maklumat anda dan pastikan wajah anda berada di dalam bingkai kamera.</p>
+                <p class="mb-4 text-center text-gray-600">Sila isi maklumat dan hadapkan wajah ke kamera.</p>
                 <div class="mb-4">
                     <label for="fullNameInput" class="block text-sm font-medium text-gray-700">Nama Penuh</label>
                     <input type="text" id="fullNameInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Nama Penuh Anda">
                 </div>
                 <div class="mb-4">
                     <label for="departmentInput" class="block text-sm font-medium text-gray-700">Jabatan</label>
-                    <input type="text" id="departmentInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Nama Jabatan Anda">
+                    <input type="text" id="departmentInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Jabatan Anda">
                 </div>
                 <video id="videoElement" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
                 <canvas id="canvasElement" class="hidden"></canvas>
@@ -141,7 +145,7 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Konfigurasi Firebase
@@ -156,22 +160,13 @@
         };
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-        // Inisialisasi Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
 
-        // Koordinat pejabat dan toleransi (dalam meter)
+        // Koordinat pejabat (tukar jika perlu)
         const officeCoordinates = { latitude: 1.54287, longitude: 110.34752 };
-        const locationTolerance = 50;
-
-        // Waktu kerja
-        const shifts = [
-            { id: 'shift1', start: { hour: 7, minute: 30 }, end: { hour: 16, minute: 30 } },
-            { id: 'shift2', start: { hour: 8, minute: 0 }, end: { hour: 17, minute: 0 } },
-            { id: 'shift3', start: { hour: 8, minute: 30 }, end: { hour: 17, minute: 30 } }
-        ];
+        const locationTolerance = 50; // dalam meter
 
         // Global variables
         let userId = null;
@@ -181,7 +176,7 @@
         let videoStream = null;
         let faceDetectionInterval = null;
 
-        // Elemen DOM
+        // DOM Elements
         const dashboardDiv = document.getElementById('dashboard');
         const registrationPageDiv = document.getElementById('registrationPage');
         const statusMessageDiv = document.getElementById('statusMessage');
@@ -196,6 +191,10 @@
         // Pastikan jsPDF tersedia
         window.jsPDF = window.jspdf.jsPDF;
 
+        // ✅ GUNAKAN MODEL DARI GITHUB ANDA
+        // Gantikan 'username' dan 'repo' dengan milik anda
+        const MODEL_URL = 'https://raw.githubusercontent.com/jimswk/repo/main/weights';
+
         // Fungsi: Kira jarak (Haversine)
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3;
@@ -208,7 +207,6 @@
             return R * c;
         }
 
-        // Papar mesej status
         function showStatusMessage(message, type = 'info') {
             statusMessageDiv.textContent = message;
             statusMessageDiv.className = `message-box ${type}`;
@@ -219,7 +217,6 @@
             statusMessageDiv.classList.add('hidden');
         }
 
-        // Tukar paparan
         window.showDashboard = function() {
             dashboardDiv.classList.remove('hidden');
             registrationPageDiv.classList.add('hidden');
@@ -245,13 +242,9 @@
             startCamera();
         };
 
-        // Muat model Face-API.js
+        // Muat model face-api.js
         async function loadFaceModels() {
-            showStatusMessage('Memuatkan model pengecaman wajah...');
-            
-            // ✅ Correct URL pointing to GitHub raw content
-            const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
-        
+            showStatusMessage('Memuatkan model wajah...');
             try {
                 await Promise.all([
                     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -261,15 +254,14 @@
                 showStatusMessage('Model berjaya dimuatkan.', 'success');
                 return true;
             } catch (error) {
-                console.error('Error loading face-api models:', error);
-                showStatusMessage('Gagal muat model. Semak sambungan internet atau cuba semula.', 'error');
+                showStatusMessage('Gagal muat model. Pastikan folder /weights betul.', 'error');
+                console.error('Model load error:', error);
                 return false;
             }
         }
 
-        // Mulakan kamera
         async function startCamera() {
-            if (videoStream) videoStream.getTracks().forEach(track => track.stop());
+            if (videoStream) videoStream.getTracks().forEach(t => t.stop());
             try {
                 videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 videoElement.srcObject = videoStream;
@@ -278,7 +270,6 @@
             }
         }
 
-        // Pendaftaran Wajah
         window.handleFaceRegistration = async function() {
             const fullName = document.getElementById('fullNameInput').value;
             const department = document.getElementById('departmentInput').value;
@@ -306,7 +297,7 @@
                         await setDoc(userDocRef, {
                             name: fullName,
                             department: department,
-                            faceDescriptor: JSON.stringify(faceDescriptor),
+                            faceDescriptor: JSON.stringify(faceDescriptor)
                         }, { merge: true });
 
                         isFaceRegistered = true;
@@ -315,19 +306,21 @@
                         showStatusMessage('Pendaftaran berjaya!', 'success');
                         window.showDashboard();
                     } else {
-                        showStatusMessage('Wajah tidak dikesan.');
+                        showStatusMessage('Wajah tidak dikesan. Cuba lagi.');
                     }
                 }, 1000);
             }, { once: true });
         };
 
         function createFaceMatcher(descriptor) {
-            const labeledDescriptors = [new faceapi.LabeledFaceDescriptors(userId, [new Float32Array(JSON.parse(descriptor))])];
+            const labeledDescriptors = [
+                new faceapi.LabeledFaceDescriptors(userId, [new Float32Array(JSON.parse(descriptor))])
+            ];
             faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
         }
 
         window.handleFaceCheck = async function() {
-            showStatusMessage('Memulakan pengecaman wajah...');
+            showStatusMessage('Mengesan wajah...');
             const modelsLoaded = await loadFaceModels();
             if (!modelsLoaded) return;
             await startCamera();
@@ -342,7 +335,7 @@
                         const match = faceMatcher.findBestMatch(detections.descriptor);
                         if (match.label === userId) {
                             clearInterval(faceDetectionInterval);
-                            showStatusMessage('Wajah sepadan! Melakukan Clock In/Out...', 'success');
+                            showStatusMessage('Wajah sepadan! Clock In/Out...', 'success');
                             window.handleClockAction();
                         } else {
                             showStatusMessage('Wajah tidak sepadan.', 'error');
@@ -355,7 +348,7 @@
         };
 
         window.handleClockAction = async function() {
-            showStatusMessage('Mendapatkan lokasi...');
+            showStatusMessage('Dapatkan lokasi...');
             try {
                 const position = await new Promise((resolve, reject) => {
                     navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
@@ -364,7 +357,7 @@
                 const distance = calculateDistance(latitude, longitude, officeCoordinates.latitude, officeCoordinates.longitude);
 
                 if (distance > locationTolerance) {
-                    showStatusMessage(`Jarak: ${distance.toFixed(2)}m dari pejabat. Gagal.`, 'error');
+                    showStatusMessage(`Anda berada ${distance.toFixed(2)}m dari pejabat.`, 'error');
                     return;
                 }
 
@@ -373,13 +366,11 @@
                 const currentTime = new Date();
 
                 if (docSnap.exists() && docSnap.data().clockIn) {
-                    // Clock Out
                     const clockInTime = docSnap.data().clockIn.toDate();
                     const totalHours = (currentTime - clockInTime) / (1000 * 60 * 60);
                     await setDoc(docRef, { clockOut: currentTime, totalHours }, { merge: true });
                     showStatusMessage('Clock Out Berjaya!', 'success');
                 } else {
-                    // Clock In
                     await setDoc(docRef, {
                         date: currentTime,
                         weekday: currentTime.toLocaleDateString('ms-MY', { weekday: 'long' }),
@@ -402,7 +393,7 @@
                 where('date', '<=', endOfMonth)
             );
             const querySnapshot = await getDocs(q);
-            const attendanceData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const data = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
             const doc = new jsPDF('p', 'mm', 'a4');
             doc.setFont('helvetica');
@@ -420,13 +411,13 @@
             headers.forEach((h, i) => doc.text(h, 14 + i * 30, y));
             y += 10;
 
-            attendanceData.forEach(item => {
+            data.forEach(item => {
                 doc.text(item.date.toDate().toISOString().slice(0, 10), 14, y);
                 doc.text(item.weekday, 44, y);
                 doc.text(item.clockIn ? item.clockIn.toDate().toLocaleTimeString() : '-', 74, y);
                 doc.text(item.clockOut ? item.clockOut.toDate().toLocaleTimeString() : '-', 104, y);
-                doc.text(item.totalHours ? item.totalHours.toFixed(2) : '-', 134, y);
-                doc.text(item.totalOT ? item.totalOT.toFixed(2) : '-', 164, y);
+                doc.text(item.totalHours?.toFixed(2) || '-', 134, y);
+                doc.text(item.totalOT?.toFixed(2) || '-', 164, y);
                 y += 5;
             });
 
@@ -450,8 +441,8 @@
         }
 
         function generateQRCode(data) {
-            QRCode.toCanvas(document.getElementById('qrCodeCanvas'), data, function (error) {
-                if (error) console.error(error);
+            QRCode.toCanvas(document.getElementById('qrCodeCanvas'), data, err => {
+                if (err) console.error(err);
             });
         }
 
@@ -461,14 +452,9 @@
 
         // Inisialisasi
         window.onload = async function() {
-            try {
-                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                if (token) await signInWithCustomToken(auth, token);
-                else await signInAnonymously(auth);
-            } catch (e) {
-                console.error("Login gagal:", e);
-                await signInAnonymously(auth).catch(() => {});
-            }
+            await signInAnonymously(auth).catch(() => {
+                showStatusMessage('Gagal log masuk.', 'error');
+            });
 
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
@@ -486,7 +472,6 @@
                             createFaceMatcher(userData.faceDescriptor);
                         }
                     } else {
-                        userData = { name: 'Pengguna', department: 'Tiada' };
                         userNameDisplay.textContent = 'Selamat Datang, Pengguna';
                     }
 
@@ -501,13 +486,11 @@
                     });
 
                     showDashboard();
-                } else {
-                    showStatusMessage('Sila log masuk.', 'error');
                 }
             });
         };
 
-        // Attach event listeners
+        // Event Listeners
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('registerFaceBtn')?.addEventListener('click', window.showRegistration);
             document.getElementById('clockButton')?.addEventListener('click', window.handleFaceCheck);

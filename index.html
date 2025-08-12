@@ -14,6 +14,12 @@
     <form id="loginForm">
       <input type="text" id="name" placeholder="Nama Penuh" value="Mohammad Azzer bin Taip" required />
       <input type="text" id="staffId" placeholder="ID Kakitangan" value="UPSKK001" required />
+      <label for="shift">Shift:</label>
+      <select id="shift" required>
+        <option value="7:30">7:30 AM - 4:30 PM</option>
+        <option value="8:00">8:00 AM - 5:00 PM</option>
+        <option value="8:30">8:30 AM - 5:30 PM</option>
+      </select>
       <button type="submit">Log Masuk</button>
     </form>
     <p id="loginError" style="color: red; display: none;"></p>

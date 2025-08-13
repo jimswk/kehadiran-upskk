@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Perakam Waktu UPSKK</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- face-api.js -->
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
@@ -59,10 +56,8 @@
     <div class="container bg-white rounded-lg shadow-lg">
         <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">Sistem Perakam Waktu UPSKK</h1>
 
-        <!-- Mesej Status -->
         <div id="statusMessage" class="message-box info hidden"></div>
 
-        <!-- Halaman Log Masuk -->
         <div id="loginPage" class="flex flex-col items-center">
             <h2 class="text-2xl font-bold mb-4 text-gray-800">Log Masuk</h2>
             <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
@@ -81,7 +76,6 @@
             </div>
         </div>
 
-        <!-- Halaman Pendaftaran Akaun -->
         <div id="accountRegistrationPage" class="hidden flex flex-col items-center p-4">
             <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Pendaftaran Akaun Baru</h2>
             <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
@@ -108,7 +102,6 @@
             </div>
         </div>
 
-        <!-- Halaman Pendaftaran Wajah -->
         <div id="faceRegistrationPage" class="hidden flex flex-col items-center p-4">
             <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Pendaftaran Wajah</h2>
             <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
@@ -122,7 +115,6 @@
             </div>
         </div>
 
-        <!-- Dashboard -->
         <div id="dashboard" class="hidden flex flex-col items-center">
             <div id="user-info" class="text-center my-4">
                 <p class="text-xl font-medium text-gray-700" id="userName">Selamat Datang</p>
@@ -171,7 +163,6 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -222,7 +213,7 @@
         const faceScanBtn = document.getElementById('faceScanBtn');
         const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
         const locationStatusEl = document.getElementById('locationStatus');
-
+        
         // Pastikan jsPDF tersedia
         window.jsPDF = window.jspdf.jsPDF;
 
@@ -487,9 +478,19 @@
                     // Clock Out
                     const clockIn = docSnap.data().clockIn.toDate();
                     const totalHours = (now - clockIn) / (1000 * 60 * 60);
+                    
+                    // Calculate Overtime
+                    const clockOutTime = now.getHours() * 60 + now.getMinutes();
+                    const nominalClockOut = 17 * 60 + 30; // 5:30 PM
+                    let totalOT = 0;
+                    if (clockOutTime > nominalClockOut) {
+                        totalOT = (clockOutTime - nominalClockOut) / 60;
+                    }
+
                     await setDoc(docRef, {
                         clockOut: now,
                         totalHours,
+                        totalOT,
                         locationOut: { lat: latitude, lng: longitude }
                     }, { merge: true });
                     showStatusMessage('Clock Out Berjaya!', 'success');
@@ -528,7 +529,7 @@
             const month = now.getMonth();
 
             const startOfMonth = new Date(year, month, 1);
-            const endOfMonth = new Date(year, month + 1, 0); // hari terakhir bulan
+            const endOfMonth = new Date(year, month + 1, 0);
 
             const q = query(
                 collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
@@ -538,82 +539,84 @@
             const snap = await getDocs(q);
             const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-            // Gunakan Times New Roman
             const doc = new jsPDF({
                 format: 'a4',
                 unit: 'mm'
             });
 
-            // Font Times New Roman
             doc.setFont('times', 'normal');
 
-            // Title (Tengah, Saiz 14)
+            // Headers and User Info
+            const pageWidth = doc.internal.pageSize.getWidth();
             doc.setFontSize(14);
             doc.setFont('times', 'bold');
-            const pageWidth = doc.internal.pageSize.getWidth();
             const title = 'Total Time Card';
             const titleWidth = doc.getTextWidth(title);
             doc.text(title, (pageWidth - titleWidth) / 2, 20);
-
-            // Start & End Date
-            doc.setFont('times', 'normal');
+            
             doc.setFontSize(10);
+            doc.setFont('times', 'normal');
             const startStr = startOfMonth.toISOString().slice(0, 10);
             const endStr = endOfMonth.toISOString().slice(0, 10);
             doc.text(`Start Date ${startStr} End Date ${endStr}`, 14, 30);
-
-            // Name & Department
-            doc.text(`First Name: ${userData?.name || 'Pengguna'}, Department: ${userData?.department || 'Tiada'}`, 14, 40);
-
-            // Header jadual
-            doc.setFontSize(10);
+            doc.text(`First Name: ${userData?.name || 'Pengguna'}, Department: ${userData?.department || 'Tiada'}`, 14, 35);
+            
+            // Table Headers
             const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Total Hours", "Total OT"];
-            let y = 50;
-            const colWidth = 30;
+            const colWidths = [30, 25, 25, 25, 25, 25];
+            let y = 45;
+            let x = 14;
 
-            // Lukis border header
+            doc.setFont('times', 'bold');
             doc.setDrawColor(0);
-            doc.setLineWidth(0.3);
-            for (let i = 0; i < headers.length; i++) {
-                doc.text(headers[i], 14 + i * colWidth, y);
-                doc.rect(14 + i * colWidth, y - 5, colWidth, 8);
-            }
-            y += 10;
-
-            // Data kehadiran (1 hingga akhir bulan)
+            doc.setLineWidth(0.2);
+            
+            headers.forEach((header, i) => {
+                doc.rect(x, y - 5, colWidths[i], 8);
+                doc.text(header, x + 2, y);
+                x += colWidths[i];
+            });
+            
+            // Table Body and Data
+            y += 8;
+            doc.setFont('times', 'normal');
             let totalHours = 0;
             let totalOT = 0;
+            
             for (let day = 1; day <= endOfMonth.getDate(); day++) {
                 const date = new Date(year, month, day);
                 const dateString = date.toISOString().slice(0, 10);
                 const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
 
                 const record = data.find(d => d.date.toDate().toISOString().slice(0, 10) === dateString) || {};
-
-                const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('en-US') : '';
-                const clockOut = record.clockOut ? record.clockOut.toDate().toLocaleTimeString('en-US') : '';
+                const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+                const clockOut = record.clockOut ? record.clockOut.toDate().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
                 const hours = record.totalHours ? record.totalHours.toFixed(2) : '';
                 const ot = record.totalOT ? record.totalOT.toFixed(2) : '';
 
                 if (record.totalHours) totalHours += record.totalHours;
                 if (record.totalOT) totalOT += record.totalOT;
 
-                // Lukis baris jadual
-                for (let i = 0; i < 6; i++) {
-                    const x = 14 + i * colWidth;
-                    const text = [dateString, weekday, clockIn, clockOut, hours, ot][i];
+                x = 14;
+                const rowData = [dateString, weekday, clockIn, clockOut, hours, ot];
+                
+                rowData.forEach((text, i) => {
+                    doc.rect(x, y - 5, colWidths[i], 8);
                     doc.text(text, x + 2, y);
-                    doc.rect(x, y - 5, colWidth, 8);
-                }
+                    x += colWidths[i];
+                });
                 y += 8;
             }
 
-            // Statistic
-            y += 10;
-            doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 14, y);
-            doc.text(`Total OT: ${totalOT.toFixed(2)}`, 14, y + 6);
-
-            // Simpan PDF
+            // Statistic Row
+            y += 5;
+            doc.setFont('times', 'bold');
+            doc.rect(14, y - 5, colWidths.reduce((a, b) => a + b, 0), 8); // Full row border
+            doc.text('Statistic', 16, y);
+            doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 16 + colWidths[0] + colWidths[1], y);
+            doc.text(`Total OT: ${totalOT.toFixed(2)}`, 16 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y);
+            
+            // Save PDF
             doc.save('Laporan_Kehadiran.pdf');
         };
 
@@ -624,16 +627,38 @@
                 const row = document.createElement('tr');
                 const date = item.date.toDate().toISOString().slice(0, 10);
                 const weekday = item.weekday;
-                const clockInTime = item.clockIn ? item.clockIn.toDate().toLocaleTimeString('ms-MY') : '-';
-                const clockOutTime = item.clockOut ? item.clockOut.toDate().toLocaleTimeString('ms-MY') : '-';
+                
+                // Clock In
+                const clockInTime = item.clockIn ? item.clockIn.toDate() : null;
+                const clockInDisplay = clockInTime ? clockInTime.toLocaleTimeString('ms-MY') : '-';
+                const clockInClasses = [];
+                if (clockInTime) {
+                    const nominalClockInStart = new Date(clockInTime.getFullYear(), clockInTime.getMonth(), clockInTime.getDate(), 7, 30);
+                    const nominalClockInEnd = new Date(clockInTime.getFullYear(), clockInTime.getMonth(), clockInTime.getDate(), 8, 30);
+                    if (clockInTime < nominalClockInStart || clockInTime > nominalClockInEnd) {
+                        clockInClasses.push('text-red-600');
+                    }
+                }
+                
+                // Clock Out
+                const clockOutTime = item.clockOut ? item.clockOut.toDate() : null;
+                const clockOutDisplay = clockOutTime ? clockOutTime.toLocaleTimeString('ms-MY') : '-';
+                const clockOutClasses = [];
+                if (clockOutTime) {
+                    const nominalClockOutStart = new Date(clockOutTime.getFullYear(), clockOutTime.getMonth(), clockOutTime.getDate(), 16, 30);
+                    if (clockOutTime < nominalClockOutStart) {
+                        clockOutClasses.push('text-red-600');
+                    }
+                }
+                
                 const totalHours = item.totalHours ? item.totalHours.toFixed(2) : '-';
                 const totalOT = item.totalOT ? item.totalOT.toFixed(2) : '-';
 
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${date}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${weekday}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm">${clockInTime}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm">${clockOutTime}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockInClasses.join(' ')}">${clockInDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockOutClasses.join(' ')}">${clockOutDisplay}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalHours}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalOT}</td>
                 `;
@@ -644,7 +669,7 @@
         // Util
         function getCurrentDate() { return new Date().toISOString().slice(0, 10); }
         function getStartOfMonth() { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; }
-        function getEndOfMonth() { const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(0); d.setHours(23,59,59,999); return d; }
+        function getEndOfMonth() { const d = new Date(); d.setMonth(d.getMonth() + 1, 0); d.setHours(23, 59, 59, 999); return d; }
 
         // Inisialisasi
         window.onload = async function() {

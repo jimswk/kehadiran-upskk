@@ -481,19 +481,20 @@
 
                 if (docSnap.exists() && docSnap.data().clockIn) {
                     const clockIn = docSnap.data().clockIn.toDate();
-                    const totalHours = (now - clockIn) / (1000 * 60 * 60);
+                    const totalMilliseconds = now - clockIn;
+                    const totalHoursDecimal = totalMilliseconds / (1000 * 60 * 60);
 
                     const clockOutTime = now.getHours() * 60 + now.getMinutes();
                     const nominalClockOut = 17 * 60 + 30;
-                    let totalOT = 0;
+                    let totalOTDecimal = 0;
                     if (clockOutTime > nominalClockOut) {
-                        totalOT = (clockOutTime - nominalClockOut) / 60;
+                        totalOTDecimal = (clockOutTime - nominalClockOut) / 60;
                     }
 
                     await setDoc(docRef, {
                         clockOut: now,
-                        totalHours,
-                        totalOT,
+                        totalHours: totalHoursDecimal,
+                        totalOT: totalOTDecimal,
                         locationOut: { lat: latitude, lng: longitude }
                     }, { merge: true });
                     showStatusMessage('Clock Out Berjaya!', 'success');
@@ -552,45 +553,45 @@
             
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
-            const marginX = 14;
-            const headerHeight = 40;
-            const tableStartY = headerHeight + 5;
+            const tableWidth = 140; // Total lebar jadual diselaraskan
+            const tableMarginX = (pageWidth - tableWidth) / 2;
+            const rowHeight = 6;
+            const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Total Hours", "Total OT"];
+            const colWidths = [30, 25, 20, 20, 20, 20]; // Lebar lajur diselaraskan
+
+            let y = 20;
 
             doc.setFontSize(14);
             doc.setFont('times', 'bold');
             const title = 'Total Time Card';
             const titleWidth = doc.getTextWidth(title);
-            doc.text(title, (pageWidth - titleWidth) / 2, 20);
-            
+            doc.text(title, (pageWidth - titleWidth) / 2, y);
+
+            y += 10;
             doc.setFontSize(10);
             doc.setFont('times', 'normal');
             const startStr = startOfMonth.toISOString().slice(0, 10);
             const endStr = endOfMonth.toISOString().slice(0, 10);
-            doc.text(`Start Date ${startStr} End Date ${endStr}`, marginX, 30);
-            doc.text(`First Name: ${userData?.name || 'Pengguna'}, Department: ${userData?.department || 'Tiada'}`, marginX, 35);
-            
-            const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Total Hours", "Total OT"];
-            const colWidths = [30, 30, 25, 25, 25, 25];
-            const tableWidth = colWidths.reduce((a, b) => a + b, 0);
-            const tableMarginX = (pageWidth - tableWidth) / 2;
-            let y = tableStartY;
-            const rowHeight = 6; 
+            doc.text(`Start Date ${startStr} End Date ${endStr}`, tableMarginX, y);
+            y += 5;
+            doc.text(`First Name: ${userData?.name || 'Pengguna'}, Department: ${userData?.department || 'Tiada'}`, tableMarginX, y);
 
+            y += 10;
             doc.setFont('times', 'bold');
             doc.setDrawColor(0);
             doc.setLineWidth(0.2);
             
             let x = tableMarginX;
             headers.forEach((header, i) => {
-                doc.rect(x, y - 5, colWidths[i], rowHeight);
-                doc.text(header, x + 2, y);
+                doc.rect(x, y, colWidths[i], rowHeight);
+                doc.text(header, x + 2, y + 4);
                 x += colWidths[i];
             });
             
             y += rowHeight;
             doc.setFont('times', 'normal');
-            let totalHours = 0;
-            let totalOT = 0;
+            let totalHoursDecimal = 0;
+            let totalOTDecimal = 0;
             
             for (let day = 1; day <= endOfMonth.getDate(); day++) {
                 const date = new Date(selectedYear, selectedMonth, day);
@@ -600,33 +601,43 @@
                 const record = data.find(d => d.date.toDate().toISOString().slice(0, 10) === dateString) || {};
                 const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '';
                 const clockOut = record.clockOut ? record.clockOut.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '';
-                const hours = record.totalHours ? record.totalHours.toFixed(2) : '';
-                const ot = record.totalOT ? record.totalOT.toFixed(2) : '';
+                const hours = record.totalHours ? record.totalHours : 0;
+                const ot = record.totalOT ? record.totalOT : 0;
 
-                if (record.totalHours) totalHours += record.totalHours;
-                if (record.totalOT) totalOT += record.totalOT;
+                totalHoursDecimal += hours;
+                totalOTDecimal += ot;
 
                 x = tableMarginX;
-                const rowData = [dateString, weekday, clockIn, clockOut, hours, ot];
+                const rowData = [dateString, weekday, clockIn, clockOut, hours.toFixed(2), ot.toFixed(2)];
                 
                 rowData.forEach((text, i) => {
-                    doc.rect(x, y - 5, colWidths[i], rowHeight);
-                    doc.text(text, x + 2, y);
+                    doc.rect(x, y, colWidths[i], rowHeight);
+                    doc.text(text, x + 2, y + 4);
                     x += colWidths[i];
                 });
                 y += rowHeight;
             }
 
-            y += 5;
+            // Baris Statistik dalam jadual
+            y += 1;
             doc.setFont('times', 'bold');
-            doc.rect(tableMarginX, y - 5, tableWidth, rowHeight);
-            doc.text('Statistic', tableMarginX + 2, y);
+            doc.rect(tableMarginX, y, tableWidth, rowHeight);
             
-            const hoursText = `Total Hours: ${totalHours.toFixed(2)}`;
-            const otText = `Total OT: ${totalOT.toFixed(2)}`;
-            doc.text(hoursText, tableMarginX + colWidths[0] + colWidths[1], y);
-            doc.text(otText, tableMarginX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y);
+            // Kolum pertama (Statistic)
+            doc.text('Statistic', tableMarginX + 2, y + 4);
 
+            // Kolum untuk Total Hours
+            const totalHoursHours = Math.floor(totalHoursDecimal);
+            const totalHoursMinutes = Math.round((totalHoursDecimal - totalHoursHours) * 60);
+            const totalHoursFormatted = `${String(totalHoursHours).padStart(2, '0')}:${String(totalHoursMinutes).padStart(2, '0')}`;
+            doc.text(totalHoursFormatted, tableMarginX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 2, y + 4);
+            
+            // Kolum untuk Total OT
+            const totalOTHours = Math.floor(totalOTDecimal);
+            const totalOTMinutes = Math.round((totalOTDecimal - totalOTHours) * 60);
+            const totalOTFormatted = `${String(totalOTHours).padStart(2, '0')}:${String(totalOTMinutes).padStart(2, '0')}`;
+            doc.text(totalOTFormatted, tableMarginX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + 2, y + 4);
+            
             doc.save(`Laporan_Kehadiran_${selectedYear}-${selectedMonth + 1}.pdf`);
         };
 

@@ -98,7 +98,7 @@
                 <button id="registerAccountBtn" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
                     Daftar Akaun
                 </button>
-                <button id="backToLoginBtn" class="mt-4 text-blue-600 hover:underline">Kembali ke Log Masuk</button>
+                <button id="backToLoginBtn" class="mt-4 w-full text-blue-600 hover:underline">Kembali ke Log Masuk</button>
             </div>
         </div>
 
@@ -548,9 +548,9 @@
                 unit: 'mm'
             });
 
+            // Guna fon Times-Roman secara lalai dalam jsPDF
             doc.setFont('times', 'normal');
             
-            // Headers and User Info
             const pageWidth = doc.internal.pageSize.getWidth();
             doc.setFontSize(14);
             doc.setFont('times', 'bold');
@@ -565,24 +565,23 @@
             doc.text(`Start Date ${startStr} End Date ${endStr}`, 14, 30);
             doc.text(`First Name: ${userData?.name || 'Pengguna'}, Department: ${userData?.department || 'Tiada'}`, 14, 35);
             
-            // Table Headers
             const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Total Hours", "Total OT"];
             const colWidths = [30, 25, 25, 25, 25, 25];
             let y = 45;
-            let x = 14;
+            const rowHeight = 6; 
 
             doc.setFont('times', 'bold');
             doc.setDrawColor(0);
             doc.setLineWidth(0.2);
             
+            let x = 14;
             headers.forEach((header, i) => {
-                doc.rect(x, y - 5, colWidths[i], 8);
+                doc.rect(x, y - 5, colWidths[i], rowHeight);
                 doc.text(header, x + 2, y);
                 x += colWidths[i];
             });
             
-            // Table Body and Data
-            y += 8;
+            y += rowHeight;
             doc.setFont('times', 'normal');
             let totalHours = 0;
             let totalOT = 0;
@@ -593,8 +592,8 @@
                 const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
 
                 const record = data.find(d => d.date.toDate().toISOString().slice(0, 10) === dateString) || {};
-                const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
-                const clockOut = record.clockOut ? record.clockOut.toDate().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+                const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '';
+                const clockOut = record.clockOut ? record.clockOut.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '';
                 const hours = record.totalHours ? record.totalHours.toFixed(2) : '';
                 const ot = record.totalOT ? record.totalOT.toFixed(2) : '';
 
@@ -605,17 +604,16 @@
                 const rowData = [dateString, weekday, clockIn, clockOut, hours, ot];
                 
                 rowData.forEach((text, i) => {
-                    doc.rect(x, y - 5, colWidths[i], 8);
+                    doc.rect(x, y - 5, colWidths[i], rowHeight);
                     doc.text(text, x + 2, y);
                     x += colWidths[i];
                 });
-                y += 8;
+                y += rowHeight;
             }
 
-            // Statistic Row
             y += 5;
             doc.setFont('times', 'bold');
-            doc.rect(14, y - 5, colWidths.reduce((a, b) => a + b, 0), 8);
+            doc.rect(14, y - 5, colWidths.reduce((a, b) => a + b, 0), rowHeight);
             doc.text('Statistic', 16, y);
             doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 16 + colWidths[0] + colWidths[1], y);
             doc.text(`Total OT: ${totalOT.toFixed(2)}`, 16 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y);
@@ -631,7 +629,7 @@
                 const weekday = item.weekday;
                 
                 const clockInTime = item.clockIn ? item.clockIn.toDate() : null;
-                const clockInDisplay = clockInTime ? clockInTime.toLocaleTimeString('ms-MY') : '-';
+                const clockInDisplay = clockInTime ? clockInTime.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '-';
                 const clockInClasses = [];
                 if (clockInTime) {
                     const nominalClockInStart = new Date(clockInTime.getFullYear(), clockInTime.getMonth(), clockInTime.getDate(), 7, 30);
@@ -642,7 +640,7 @@
                 }
                 
                 const clockOutTime = item.clockOut ? item.clockOut.toDate() : null;
-                const clockOutDisplay = clockOutTime ? clockOutTime.toLocaleTimeString('ms-MY') : '-';
+                const clockOutDisplay = clockOutTime ? clockOutTime.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '-';
                 const clockOutClasses = [];
                 if (clockOutTime) {
                     const nominalClockOutStart = new Date(clockOutTime.getFullYear(), clockOutTime.getMonth(), clockOutTime.getDate(), 16, 30);

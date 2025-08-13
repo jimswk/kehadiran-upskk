@@ -213,7 +213,7 @@
         const faceScanBtn = document.getElementById('faceScanBtn');
         const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
         const locationStatusEl = document.getElementById('locationStatus');
-        
+
         // Pastikan jsPDF tersedia
         window.jsPDF = window.jspdf.jsPDF;
 
@@ -478,7 +478,7 @@
                     // Clock Out
                     const clockIn = docSnap.data().clockIn.toDate();
                     const totalHours = (now - clockIn) / (1000 * 60 * 60);
-                    
+
                     // Calculate Overtime
                     const clockOutTime = now.getHours() * 60 + now.getMinutes();
                     const nominalClockOut = 17 * 60 + 30; // 5:30 PM
@@ -545,6 +545,8 @@
             });
 
             doc.setFont('times', 'normal');
+            doc.addFont('Times-New-Roman', 'times', 'normal');
+            doc.addFont('Times-New-Roman-Bold', 'times', 'bold');
 
             // Headers and User Info
             const pageWidth = doc.internal.pageSize.getWidth();

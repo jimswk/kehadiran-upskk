@@ -6,7 +6,7 @@
     <title>Sistem Perakam Waktu UPSKK</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- jsPDF dengan Times New Roman -->
+    <!-- jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- face-api.js -->
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
@@ -132,8 +132,9 @@
             <div class="my-8 w-full max-w-sm">
                 <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Clock In / Clock Out</h3>
                 <div class="p-6 bg-white rounded-lg shadow-md">
+                    <p class="mb-4 text-center text-gray-600" id="locationStatus">Mengesan lokasi...</p>
                     <video id="scanVideoElement" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
-                    <button id="faceScanBtn" class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
+                    <button id="faceScanBtn" class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                         Clock In / Clock Out
                     </button>
                 </div>
@@ -192,6 +193,13 @@
         const auth = getAuth(app);
         const appId = 'default-app-id';
 
+        // Koordinat pejabat dan radius
+        const officeCoordinates = {
+            latitude: 1.5329149992751578,
+            longitude: 110.35895714753464
+        };
+        const locationTolerance = 100; // dalam meter
+
         // Global variables
         let userId = null;
         let isFaceRegistered = false;
@@ -213,6 +221,7 @@
         const userIdDisplay = document.getElementById('userIdDisplay');
         const faceScanBtn = document.getElementById('faceScanBtn');
         const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
+        const locationStatusEl = document.getElementById('locationStatus');
 
         // Pastikan jsPDF tersedia
         window.jsPDF = window.jspdf.jsPDF;
@@ -389,6 +398,34 @@
             isProcessing = false;
         };
 
+        // Cek Lokasi
+        async function handleGeolocationCheck() {
+            faceScanBtn.disabled = true;
+            locationStatusEl.textContent = 'Mengesan lokasi...';
+            try {
+                const pos = await new Promise((res, rej) => {
+                    navigator.geolocation.getCurrentPosition(res, rej, {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    });
+                });
+                const { latitude, longitude } = pos.coords;
+                const distance = calculateDistance(latitude, longitude, officeCoordinates.latitude, officeCoordinates.longitude);
+
+                if (distance <= locationTolerance) {
+                    locationStatusEl.textContent = `Di dalam kawasan pejabat (${distance.toFixed(2)}m)`;
+                    faceScanBtn.disabled = false;
+                } else {
+                    locationStatusEl.textContent = `Di luar kawasan pejabat (${distance.toFixed(2)}m)`;
+                    faceScanBtn.disabled = true;
+                }
+            } catch (e) {
+                locationStatusEl.textContent = 'Gagal akses lokasi.';
+                faceScanBtn.disabled = true;
+            }
+        }
+
         // Pengecaman Wajah untuk Clock In/Out
         window.handleFaceCheck = async function() {
             if (isProcessing) return;
@@ -427,33 +464,72 @@
             }
         };
 
-        // Clock In/Out Action (tanpa lokasi)
+        // Clock In/Out Action (dengan lokasi)
         window.handleClockAction = async function() {
-            const docRef = doc(db, 'artifacts', appId, 'users', userId, 'attendance', getCurrentDate());
-            const docSnap = await getDoc(docRef);
-            const now = new Date();
+            showStatusMessage('Mengesan lokasi sebelum menyimpan...', 'info');
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
+                });
+                const { latitude, longitude } = position.coords;
+                const distance = calculateDistance(latitude, longitude, officeCoordinates.latitude, officeCoordinates.longitude);
 
-            if (docSnap.exists() && docSnap.data().clockIn) {
-                // Clock Out
-                const clockIn = docSnap.data().clockIn.toDate();
-                const totalHours = (now - clockIn) / (1000 * 60 * 60);
-                await setDoc(docRef, { clockOut: now, totalHours }, { merge: true });
-                showStatusMessage('Clock Out Berjaya!', 'success');
-            } else {
-                // Clock In
-                await setDoc(docRef, {
-                    date: now,
-                    weekday: now.toLocaleDateString('ms-MY', { weekday: 'long' }),
-                    clockIn: now
-                }, { merge: true });
-                showStatusMessage('Clock In Berjaya!', 'success');
+                if (distance > locationTolerance) {
+                    showStatusMessage(`Anda berada ${distance.toFixed(2)}m dari pejabat. Gagal clock in/out.`, 'error');
+                    return;
+                }
+
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'attendance', getCurrentDate());
+                const docSnap = await getDoc(docRef);
+                const now = new Date();
+
+                if (docSnap.exists() && docSnap.data().clockIn) {
+                    // Clock Out
+                    const clockIn = docSnap.data().clockIn.toDate();
+                    const totalHours = (now - clockIn) / (1000 * 60 * 60);
+                    await setDoc(docRef, {
+                        clockOut: now,
+                        totalHours,
+                        locationOut: { lat: latitude, lng: longitude }
+                    }, { merge: true });
+                    showStatusMessage('Clock Out Berjaya!', 'success');
+                } else {
+                    // Clock In
+                    await setDoc(docRef, {
+                        date: now,
+                        weekday: now.toLocaleDateString('en-US', { weekday: 'long' }),
+                        clockIn: now,
+                        locationIn: { lat: latitude, lng: longitude }
+                    }, { merge: true });
+                    showStatusMessage('Clock In Berjaya!', 'success');
+                }
+                handleGeolocationCheck(); // Update status lokasi
+            } catch (error) {
+                showStatusMessage('Gagal akses lokasi. Sila benarkan akses lokasi.', 'error');
             }
         };
 
+        // Fungsi kira jarak
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
         // Jana PDF mengikut format DOCX
         window.generatePDF = async function() {
-            const startOfMonth = getStartOfMonth();
-            const endOfMonth = getEndOfMonth();
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+
+            const startOfMonth = new Date(year, month, 1);
+            const endOfMonth = new Date(year, month + 1, 0); // hari terakhir bulan
+
             const q = query(
                 collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
                 where('date', '>=', startOfMonth),
@@ -471,10 +547,13 @@
             // Font Times New Roman
             doc.setFont('times', 'normal');
 
-            // Title
+            // Title (Tengah, Saiz 14)
             doc.setFontSize(14);
             doc.setFont('times', 'bold');
-            doc.text('Total Time Card', 14, 20);
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const title = 'Total Time Card';
+            const titleWidth = doc.getTextWidth(title);
+            doc.text(title, (pageWidth - titleWidth) / 2, 20);
 
             // Start & End Date
             doc.setFont('times', 'normal');
@@ -490,39 +569,51 @@
             doc.setFontSize(10);
             const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Total Hours", "Total OT"];
             let y = 50;
-            headers.forEach((header, i) => {
-                doc.text(header, 14 + i * 30, y);
-            });
+            const colWidth = 30;
+
+            // Lukis border header
+            doc.setDrawColor(0);
+            doc.setLineWidth(0.3);
+            for (let i = 0; i < headers.length; i++) {
+                doc.text(headers[i], 14 + i * colWidth, y);
+                doc.rect(14 + i * colWidth, y - 5, colWidth, 8);
+            }
             y += 10;
 
-            // Data kehadiran
-            for (let i = 1; i <= 31; i++) {
-                const date = new Date(startOfMonth.getFullYear(), startOfMonth.getMonth(), i);
-                if (date > endOfMonth) break;
-
+            // Data kehadiran (1 hingga akhir bulan)
+            let totalHours = 0;
+            let totalOT = 0;
+            for (let day = 1; day <= endOfMonth.getDate(); day++) {
+                const date = new Date(year, month, day);
                 const dateString = date.toISOString().slice(0, 10);
-                const weekday = date.toLocaleDateString('ms-MY', { weekday: 'long' });
+                const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
 
                 const record = data.find(d => d.date.toDate().toISOString().slice(0, 10) === dateString) || {};
 
-                const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('ms-MY') : '';
-                const clockOut = record.clockOut ? record.clockOut.toDate().toLocaleTimeString('ms-MY') : '';
-                const totalHours = record.totalHours ? record.totalHours.toFixed(2) : '';
-                const totalOT = record.totalOT ? record.totalOT.toFixed(2) : '';
+                const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('en-US') : '';
+                const clockOut = record.clockOut ? record.clockOut.toDate().toLocaleTimeString('en-US') : '';
+                const hours = record.totalHours ? record.totalHours.toFixed(2) : '';
+                const ot = record.totalOT ? record.totalOT.toFixed(2) : '';
 
-                doc.text(dateString, 14, y);
-                doc.text(weekday, 44, y);
-                doc.text(clockIn, 74, y);
-                doc.text(clockOut, 104, y);
-                doc.text(totalHours, 134, y);
-                doc.text(totalOT, 164, y);
-                y += 5;
+                if (record.totalHours) totalHours += record.totalHours;
+                if (record.totalOT) totalOT += record.totalOT;
+
+                // Lukis baris jadual
+                for (let i = 0; i < 6; i++) {
+                    const x = 14 + i * colWidth;
+                    const text = [dateString, weekday, clockIn, clockOut, hours, ot][i];
+                    doc.text(text, x + 2, y);
+                    doc.rect(x, y - 5, colWidth, 8);
+                }
+                y += 8;
             }
 
             // Statistic
             y += 10;
-            doc.text('Statistic', 14, y);
+            doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 14, y);
+            doc.text(`Total OT: ${totalOT.toFixed(2)}`, 14, y + 6);
 
+            // Simpan PDF
             doc.save('Laporan_Kehadiran.pdf');
         };
 
@@ -595,6 +686,7 @@
                             showPage('faceRegistrationPage');
                         } else {
                             showPage('dashboard');
+                            handleGeolocationCheck();
                         }
                     } else {
                         showPage('faceRegistrationPage');

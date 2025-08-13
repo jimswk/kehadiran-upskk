@@ -166,7 +166,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Konfigurasi Firebase
         const firebaseConfig = {
@@ -488,7 +488,7 @@
                     }
 
                     await setDoc(docRef, {
-                        clockOut: now,
+                        clockOut: Timestamp.fromDate(now),
                         totalHours,
                         totalOT,
                         locationOut: { lat: latitude, lng: longitude }
@@ -497,9 +497,9 @@
                 } else {
                     // Clock In
                     await setDoc(docRef, {
-                        date: now,
+                        date: Timestamp.fromDate(new Date(now.getFullYear(), now.getMonth(), now.getDate())),
                         weekday: now.toLocaleDateString('en-US', { weekday: 'long' }),
-                        clockIn: now,
+                        clockIn: Timestamp.fromDate(now),
                         locationIn: { lat: latitude, lng: longitude }
                     }, { merge: true });
                     showStatusMessage('Clock In Berjaya!', 'success');
@@ -536,8 +536,8 @@
         // 2. Ambil data dari Firestore
         const q = query(
             collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
-            where('date', '>=', startOfMonth),
-            where('date', '<=', endOfMonth)
+            where('date', '>=', Timestamp.fromDate(startOfMonth)),
+            where('date', '<=', Timestamp.fromDate(endOfMonth))
         );
         
         const snap = await getDocs(q);
@@ -709,8 +709,16 @@
 
         // Util
         function getCurrentDate() { return new Date().toISOString().slice(0, 10); }
-        function getStartOfMonth() { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; }
-        function getEndOfMonth() { const d = new Date(); d.setMonth(d.getMonth() + 1, 0); d.setHours(23, 59, 59, 999); return d; }
+        function getStartOfMonth() {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    return Timestamp.fromDate(start);
+}
+        function getEndOfMonth() {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return Timestamp.fromDate(end);
+}
 
         // Inisialisasi
         window.onload = async function() {

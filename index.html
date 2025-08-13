@@ -553,11 +553,11 @@
             
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
-            const tableWidth = 140; // Total lebar jadual diselaraskan
+            const tableWidth = 180; // Lebar jadual penuh untuk margin seimbang
             const tableMarginX = (pageWidth - tableWidth) / 2;
             const rowHeight = 6;
             const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Total Hours", "Total OT"];
-            const colWidths = [30, 25, 20, 20, 20, 20]; // Lebar lajur diselaraskan
+            const colWidths = [30, 30, 30, 30, 30, 30];
 
             let y = 20;
 
@@ -599,16 +599,18 @@
                 const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
 
                 const record = data.find(d => d.date.toDate().toISOString().slice(0, 10) === dateString) || {};
-                const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '';
-                const clockOut = record.clockOut ? record.clockOut.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '';
-                const hours = record.totalHours ? record.totalHours : 0;
-                const ot = record.totalOT ? record.totalOT : 0;
+                const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+                const clockOut = record.clockOut ? record.clockOut.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+                const hours = record.totalHours ? record.totalHours : null;
+                const ot = record.totalOT ? record.totalOT : null;
 
-                totalHoursDecimal += hours;
-                totalOTDecimal += ot;
+                if (hours !== null) totalHoursDecimal += hours;
+                if (ot !== null) totalOTDecimal += ot;
 
                 x = tableMarginX;
-                const rowData = [dateString, weekday, clockIn, clockOut, hours.toFixed(2), ot.toFixed(2)];
+                const hoursText = (hours !== null) ? formatDecimalToTime(hours) : '';
+                const otText = (ot !== null) ? formatDecimalToTime(ot) : '';
+                const rowData = [dateString, weekday, clockIn, clockOut, hoursText, otText];
                 
                 rowData.forEach((text, i) => {
                     doc.rect(x, y, colWidths[i], rowHeight);
@@ -623,19 +625,12 @@
             doc.setFont('times', 'bold');
             doc.rect(tableMarginX, y, tableWidth, rowHeight);
             
-            // Kolum pertama (Statistic)
             doc.text('Statistic', tableMarginX + 2, y + 4);
-
-            // Kolum untuk Total Hours
-            const totalHoursHours = Math.floor(totalHoursDecimal);
-            const totalHoursMinutes = Math.round((totalHoursDecimal - totalHoursHours) * 60);
-            const totalHoursFormatted = `${String(totalHoursHours).padStart(2, '0')}:${String(totalHoursMinutes).padStart(2, '0')}`;
-            doc.text(totalHoursFormatted, tableMarginX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 2, y + 4);
             
-            // Kolum untuk Total OT
-            const totalOTHours = Math.floor(totalOTDecimal);
-            const totalOTMinutes = Math.round((totalOTDecimal - totalOTHours) * 60);
-            const totalOTFormatted = `${String(totalOTHours).padStart(2, '0')}:${String(totalOTMinutes).padStart(2, '0')}`;
+            const totalHoursFormatted = formatDecimalToTime(totalHoursDecimal);
+            const totalOTFormatted = formatDecimalToTime(totalOTDecimal);
+
+            doc.text(totalHoursFormatted, tableMarginX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 2, y + 4);
             doc.text(totalOTFormatted, tableMarginX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + 2, y + 4);
             
             doc.save(`Laporan_Kehadiran_${selectedYear}-${selectedMonth + 1}.pdf`);
@@ -649,7 +644,7 @@
                 const weekday = item.weekday;
                 
                 const clockInTime = item.clockIn ? item.clockIn.toDate() : null;
-                const clockInDisplay = clockInTime ? clockInTime.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '-';
+                const clockInDisplay = clockInTime ? clockInTime.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', hour12: false }) : '-';
                 const clockInClasses = [];
                 if (clockInTime) {
                     const nominalClockInStart = new Date(clockInTime.getFullYear(), clockInTime.getMonth(), clockInTime.getDate(), 7, 30);
@@ -660,7 +655,7 @@
                 }
                 
                 const clockOutTime = item.clockOut ? item.clockOut.toDate() : null;
-                const clockOutDisplay = clockOutTime ? clockOutTime.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '-';
+                const clockOutDisplay = clockOutTime ? clockOutTime.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', hour12: false }) : '-';
                 const clockOutClasses = [];
                 if (clockOutTime) {
                     const nominalClockOutStart = new Date(clockOutTime.getFullYear(), clockOutTime.getMonth(), clockOutTime.getDate(), 16, 30);
@@ -669,8 +664,8 @@
                     }
                 }
                 
-                const totalHours = item.totalHours ? item.totalHours.toFixed(2) : '-';
-                const totalOT = item.totalOT ? item.totalOT.toFixed(2) : '-';
+                const totalHours = item.totalHours !== null ? formatDecimalToTime(item.totalHours) : '-';
+                const totalOT = item.totalOT !== null ? formatDecimalToTime(item.totalOT) : '-';
 
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${date}</td>
@@ -682,6 +677,16 @@
                 `;
                 attendanceTableBody.appendChild(row);
             });
+        }
+
+        // Fungsi utiliti untuk menukar format perpuluhan kepada HH:mm
+        function formatDecimalToTime(decimalHours) {
+            if (decimalHours === null || isNaN(decimalHours)) {
+                return '';
+            }
+            const hours = Math.floor(decimalHours);
+            const minutes = Math.round((decimalHours - hours) * 60);
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
         }
 
         function getCurrentDate() { return new Date().toISOString().slice(0, 10); }

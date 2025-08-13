@@ -189,7 +189,7 @@
             latitude: 1.5329149992751578,
             longitude: 110.35895714753464
         };
-        const locationTolerance = 100; // dalam meter
+        const locationTolerance = 100;
 
         // Global variables
         let userId = null;
@@ -214,7 +214,6 @@
         const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
         const locationStatusEl = document.getElementById('locationStatus');
 
-        // Pastikan jsPDF tersedia
         window.jsPDF = window.jspdf.jsPDF;
 
         // Fungsi: Paparan halaman
@@ -259,7 +258,6 @@
             }
         }
 
-        // Muat model face-api.js
         async function loadFaceModels() {
             const MODEL_URL = 'https://cdn.jsdelivr.net/gh/jimswk/kehadiran-upskk@main/weights';
             try {
@@ -295,7 +293,6 @@
             return detections ? Array.from(detections.descriptor) : null;
         }
 
-        // Pendaftaran Akaun
         window.handleAccountRegistration = async function() {
             const name = document.getElementById('registerNameInput').value.trim();
             const department = document.getElementById('registerDepartmentInput').value.trim();
@@ -320,7 +317,6 @@
             }
         };
 
-        // Log Masuk
         window.handleEmailLogin = async function() {
             const email = document.getElementById('loginEmailInput').value.trim();
             const password = document.getElementById('loginPasswordInput').value.trim();
@@ -343,14 +339,12 @@
             }
         };
 
-        // Log Keluar
         window.handleSignOut = async function() {
             await signOut(auth);
             showStatusMessage('Berjaya log keluar.', 'success');
             showPage('loginPage');
         };
 
-        // Pendaftaran Wajah
         window.handleFaceRegistration = async function() {
             if (isProcessing) return;
             isProcessing = true;
@@ -389,7 +383,6 @@
             isProcessing = false;
         };
 
-        // Cek Lokasi
         async function handleGeolocationCheck() {
             faceScanBtn.disabled = true;
             locationStatusEl.textContent = 'Mengesan lokasi...';
@@ -417,7 +410,6 @@
             }
         }
 
-        // Pengecaman Wajah untuk Clock In/Out
         window.handleFaceCheck = async function() {
             if (isProcessing) return;
             isProcessing = true;
@@ -455,7 +447,6 @@
             }
         };
 
-        // Clock In/Out Action (dengan lokasi)
         window.handleClockAction = async function() {
             showStatusMessage('Mengesan lokasi sebelum menyimpan...', 'info');
             try {
@@ -475,13 +466,11 @@
                 const now = new Date();
 
                 if (docSnap.exists() && docSnap.data().clockIn) {
-                    // Clock Out
                     const clockIn = docSnap.data().clockIn.toDate();
                     const totalHours = (now - clockIn) / (1000 * 60 * 60);
 
-                    // Calculate Overtime
                     const clockOutTime = now.getHours() * 60 + now.getMinutes();
-                    const nominalClockOut = 17 * 60 + 30; // 5:30 PM
+                    const nominalClockOut = 17 * 60 + 30;
                     let totalOT = 0;
                     if (clockOutTime > nominalClockOut) {
                         totalOT = (clockOutTime - nominalClockOut) / 60;
@@ -495,7 +484,6 @@
                     }, { merge: true });
                     showStatusMessage('Clock Out Berjaya!', 'success');
                 } else {
-                    // Clock In
                     await setDoc(docRef, {
                         date: Timestamp.fromDate(new Date(now.getFullYear(), now.getMonth(), now.getDate())),
                         weekday: now.toLocaleDateString('en-US', { weekday: 'long' }),
@@ -504,13 +492,12 @@
                     }, { merge: true });
                     showStatusMessage('Clock In Berjaya!', 'success');
                 }
-                handleGeolocationCheck(); // Update status lokasi
+                handleGeolocationCheck();
             } catch (error) {
                 showStatusMessage('Gagal akses lokasi. Sila benarkan akses lokasi.', 'error');
             }
         };
 
-        // Fungsi kira jarak
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3;
             const φ1 = lat1 * Math.PI / 180;
@@ -522,205 +509,153 @@
             return R * c;
         }
 
-        // Jana PDF mengikut format DOCX
         window.generatePDF = async function() {
-    try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth();
+            try {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = now.getMonth();
 
-        // 1. Tentukan rentang tanggal
-        const startOfMonth = new Date(year, month, 1, 0, 0, 0);
-        const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59);
+                const startOfMonth = new Date(year, month, 1, 0, 0, 0);
+                const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59);
 
-        // 2. Ambil data dari Firestore
-        const q = query(
-            collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
-            where('date', '>=', Timestamp.fromDate(startOfMonth)),
-            where('date', '<=', Timestamp.fromDate(endOfMonth))
-        );
-        
-        const snap = await getDocs(q);
-        const data = snap.docs.map(d => {
-            const docData = d.data();
-            return {
-                id: d.id,
-                date: docData.date.toDate(),
-                clockIn: docData.clockIn?.toDate(),
-                clockOut: docData.clockOut?.toDate(),
-                totalHours: docData.totalHours || 0,
-                totalOT: docData.totalOT || 0
-            };
-        });
+                const q = query(
+                    collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
+                    where('date', '>=', Timestamp.fromDate(startOfMonth)),
+                    where('date', '<=', Timestamp.fromDate(endOfMonth))
+                );
 
-        // 3. Buat PDF
-        const doc = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
-        });
+                const snap = await getDocs(q);
+                const data = snap.docs.map(d => {
+                    const docData = d.data();
+                    return {
+                        id: d.id,
+                        date: docData.date.toDate(),
+                        clockIn: docData.clockIn?.toDate(),
+                        clockOut: docData.clockOut?.toDate(),
+                        totalHours: docData.totalHours || 0,
+                        totalOT: docData.totalOT || 0
+                    };
+                });
 
-        // 4. Header
-        doc.setFont('helvetica');
-        doc.setFontSize(14);
-        doc.text('Total Time Card', 105, 20, { align: 'center' });
-        
-        doc.setFontSize(10);
-        doc.text(`Start Date ${formatDate(startOfMonth)} End Date ${formatDate(endOfMonth)}`, 14, 30);
-        doc.text(`First Name: ${userData?.name || '-'}, Department: ${userData?.department || '-'}`, 14, 35);
+                const doc = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
 
-        // 5. Tabel
-        const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Hours", "OT"];
-        const colWidths = [25, 25, 25, 25, 20, 20];
-        let y = 45;
-        
-        // Header tabel
-        doc.setFont('helvetica', 'bold');
-        let x = 14;
-        headers.forEach((header, i) => {
-            doc.rect(x, y-5, colWidths[i], 8);
-            doc.text(header, x+2, y);
-            x += colWidths[i];
-        });
-        
-        // Isi tabel
-        y += 8;
-        doc.setFont('helvetica', 'normal');
-        let totalHours = 0;
-        let totalOT = 0;
-        
-        for (let day = 1; day <= endOfMonth.getDate(); day++) {
-            const currentDate = new Date(year, month, day);
-            const dateStr = formatDate(currentDate);
-            const weekday = currentDate.toLocaleDateString('ms-MY', { weekday: 'long' });
-            
-            const record = data.find(item => 
-                item.date.getDate() === day && 
-                item.date.getMonth() === month
-            );
-            
-            const clockIn = record?.clockIn;
-            const clockOut = record?.clockOut;
-            
-            // Format waktu
-            const clockInStr = clockIn ? formatTime(clockIn) : '-';
-            const clockOutStr = clockOut ? formatTime(clockOut) : '-';
-            
-            // Validasi waktu
-            const isLate = clockIn && (clockIn.getHours() > 8 || (clockIn.getHours() === 8 && clockIn.getMinutes() > 30));
-            const isEarly = clockOut && (clockOut.getHours() < 16 || (clockOut.getHours() === 16 && clockOut.getMinutes() < 30));
-            
-            const hours = record?.totalHours?.toFixed(2) || '-';
-            const ot = record?.totalOT?.toFixed(2) || '-';
+                doc.setFont('helvetica');
+                doc.setFontSize(14);
+                doc.text('Total Time Card', 105, 20, { align: 'center' });
 
-            if (record?.totalHours) totalHours += record.totalHours;
-            if (record?.totalOT) totalOT += record.totalOT;
+                doc.setFontSize(10);
+                doc.text(`Start Date ${formatDate(startOfMonth)} End Date ${formatDate(endOfMonth)}`, 14, 30);
+                doc.text(`First Name: ${userData?.name || '-'}, Department: ${userData?.department || '-'}`, 14, 35);
 
-            // Gambar baris dengan penanganan warna yang benar
-            x = 14;
-            [dateStr, weekday, clockInStr, clockOutStr, hours, ot].forEach((text, i) => {
-                doc.rect(x, y-5, colWidths[i], 8);
-                
-                // PERBAIKAN UTAMA: Format setTextColor yang benar
-                if ((i === 2 && isLate) || (i === 3 && isEarly)) {
-                    doc.setTextColor(255, 0, 0); // Format RGB numerik
-                } else {
-                    doc.setTextColor(0, 0, 0);
+                const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Hours", "OT"];
+                const colWidths = [25, 25, 25, 25, 20, 20];
+                let y = 45;
+
+                doc.setFont('helvetica', 'bold');
+                let x = 14;
+                headers.forEach((header, i) => {
+                    doc.rect(x, y-5, colWidths[i], 8);
+                    doc.text(header, x+2, y);
+                    x += colWidths[i];
+                });
+
+                y += 8;
+                doc.setFont('helvetica', 'normal');
+                let totalHours = 0;
+                let totalOT = 0;
+
+                for (let day = 1; day <= endOfMonth.getDate(); day++) {
+                    const currentDate = new Date(year, month, day);
+                    const dateStr = formatDate(currentDate);
+                    const weekday = currentDate.toLocaleDateString('ms-MY', { weekday: 'long' });
+
+                    const record = data.find(item => {
+                        const itemDate = item.date;
+                        return itemDate.getDate() === day && itemDate.getMonth() === month && itemDate.getFullYear() === year;
+                    });
+
+                    const clockInStr = record?.clockIn ? formatTime(record.clockIn) : '-';
+                    const clockOutStr = record?.clockOut ? formatTime(record.clockOut) : '-';
+                    const hours = record?.totalHours?.toFixed(2) || '-';
+                    const ot = record?.totalOT?.toFixed(2) || '-';
+
+                    if (record?.totalHours) totalHours += record.totalHours;
+                    if (record?.totalOT) totalOT += record.totalOT;
+
+                    x = 14;
+                    [dateStr, weekday, clockInStr, clockOutStr, hours, ot].forEach((text, i) => {
+                        doc.rect(x, y-5, colWidths[i], 8);
+                        doc.setTextColor(0, 0, 0);
+                        doc.text(text.toString(), x+2, y);
+                        x += colWidths[i];
+                    });
+                    y += 8;
                 }
-                
-                doc.text(text.toString(), x+2, y);
-                x += colWidths[i];
-            });
-            
-            y += 8;
+
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Total Hours: ${totalHours.toFixed(2)} | Total OT: ${totalOT.toFixed(2)}`, 14, y+10);
+
+                doc.save(`Laporan_Kehadiran_${userData.name}_${year}_${month+1}.pdf`);
+
+            } catch (error) {
+                console.error("Error generating PDF:", error);
+                showStatusMessage('Gagal membuat laporan PDF. Silakan coba lagi.', 'error');
+            }
+        };
+
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
         }
 
-        // 6. Footer
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Total Hours: ${totalHours.toFixed(2)} | Total OT: ${totalOT.toFixed(2)}`, 14, y+10);
-        
-        // 7. Simpan PDF
-        doc.save(`Laporan_Kehadiran_${userData.name}_${year}_${month+1}.pdf`);
+        function formatTime(date) {
+            return date.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
 
-    } catch (error) {
-        console.error("Error generating PDF:", error);
-        showStatusMessage('Gagal membuat laporan PDF. Silakan coba lagi.', 'error');
-    }
-
-    // Fungsi pembantu
-    function formatDate(date) {
-        return date.toISOString().split('T')[0]; // YYYY-MM-DD
-    }
-    
-    function formatTime(date) {
-        return date.toLocaleTimeString('ms-MY', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: true 
-        });
-    }
-};
-
-        // Update jadual
         function updateAttendanceTable(data) {
             attendanceTableBody.innerHTML = '';
-            data.forEach(item => {
-                const row = document.createElement('tr');
-                const date = item.date.toDate().toISOString().slice(0, 10);
-                const weekday = item.weekday;
-                
-                // Clock In
-                const clockInTime = item.clockIn ? item.clockIn.toDate() : null;
-                const clockInDisplay = clockInTime ? clockInTime.toLocaleTimeString('ms-MY') : '-';
-                const clockInClasses = [];
-                if (clockInTime) {
-                    const nominalClockInStart = new Date(clockInTime.getFullYear(), clockInTime.getMonth(), clockInTime.getDate(), 7, 30);
-                    const nominalClockInEnd = new Date(clockInTime.getFullYear(), clockInTime.getMonth(), clockInTime.getDate(), 8, 30);
-                    if (clockInTime < nominalClockInStart || clockInTime > nominalClockInEnd) {
-                        clockInClasses.push('text-red-600');
-                    }
-                }
-                
-                // Clock Out
-                const clockOutTime = item.clockOut ? item.clockOut.toDate() : null;
-                const clockOutDisplay = clockOutTime ? clockOutTime.toLocaleTimeString('ms-MY') : '-';
-                const clockOutClasses = [];
-                if (clockOutTime) {
-                    const nominalClockOutStart = new Date(clockOutTime.getFullYear(), clockOutTime.getMonth(), clockOutTime.getDate(), 16, 30);
-                    if (clockOutTime < nominalClockOutStart) {
-                        clockOutClasses.push('text-red-600');
-                    }
-                }
-                
-                const totalHours = item.totalHours ? item.totalHours.toFixed(2) : '-';
-                const totalOT = item.totalOT ? item.totalOT.toFixed(2) : '-';
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
 
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const currentDate = new Date(currentYear, currentMonth, day);
+                const dateStr = formatDate(currentDate);
+                const weekday = currentDate.toLocaleDateString('ms-MY', { weekday: 'long' });
+
+                const record = data.find(item => {
+                    const itemDate = item.date.toDate();
+                    return itemDate.getDate() === day && itemDate.getMonth() === currentMonth && itemDate.getFullYear() === currentYear;
+                });
+
+                const clockInTime = record?.clockIn ? new Date(record.clockIn) : null;
+                const clockInDisplay = clockInTime ? clockInTime.toLocaleTimeString('ms-MY') : '-';
+                const clockOutTime = record?.clockOut ? new Date(record.clockOut) : null;
+                const clockOutDisplay = clockOutTime ? clockOutTime.toLocaleTimeString('ms-MY') : '-';
+
+                const totalHours = record?.totalHours ? record.totalHours.toFixed(2) : '-';
+                const totalOT = record?.totalOT ? record.totalOT.toFixed(2) : '-';
+
+                const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${dateStr}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${weekday}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockInClasses.join(' ')}">${clockInDisplay}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockOutClasses.join(' ')}">${clockOutDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockInTime && (clockInTime.getHours() > 8 || (clockInTime.getHours() === 8 && clockInTime.getMinutes() > 30)) ? 'text-red-600' : ''}">${clockInDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockOutTime && clockOutTime.getHours() < 16 ? 'text-red-600' : ''}">${clockOutDisplay}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalHours}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalOT}</td>
                 `;
                 attendanceTableBody.appendChild(row);
-            });
+            }
         }
 
-        // Util
         function getCurrentDate() { return new Date().toISOString().slice(0, 10); }
-        function getStartOfMonth() {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    return Timestamp.fromDate(start);
-}
-        function getEndOfMonth() {
-    const now = new Date();
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    return Timestamp.fromDate(end);
-}
 
-        // Inisialisasi
         window.onload = async function() {
             await loadFaceModels();
 
@@ -746,11 +681,16 @@
                             }
                         }
 
+                        const now = new Date();
+                        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
                         const q = query(
                             collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
-                            where('date', '>=', getStartOfMonth()),
-                            where('date', '<=', getEndOfMonth())
+                            where('date', '>=', Timestamp.fromDate(startOfMonth)),
+                            where('date', '<=', Timestamp.fromDate(endOfMonth))
                         );
+
                         onSnapshot(q, snap => {
                             const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                             updateAttendanceTable(data);
@@ -771,7 +711,6 @@
             });
         };
 
-        // Event Listeners
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('loginBtn').addEventListener('click', window.handleEmailLogin);
             document.getElementById('goToRegisterBtn').addEventListener('click', () => showPage('accountRegistrationPage'));

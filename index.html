@@ -58,7 +58,6 @@
 
         <div id="statusMessage" class="message-box info hidden"></div>
 
-        <!-- Login Page -->
         <div id="loginPage" class="flex flex-col items-center">
             <h2 class="text-2xl font-bold mb-4 text-gray-800">Log Masuk</h2>
             <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
@@ -77,7 +76,6 @@
             </div>
         </div>
 
-        <!-- Registration Pages (Account & Face) -->
         <div id="accountRegistrationPage" class="hidden flex flex-col items-center p-4">
             <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">Pendaftaran Akaun Baru</h2>
             <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
@@ -117,33 +115,12 @@
             </div>
         </div>
 
-        <!-- Dashboard -->
         <div id="dashboard" class="hidden flex flex-col items-center">
             <div id="user-info" class="text-center my-4">
                 <p class="text-xl font-medium text-gray-700" id="userName">Selamat Datang</p>
                 <p class="text-sm text-gray-500" id="userIdDisplay"></p>
             </div>
 
-            <!-- Pilihan Bulan -->
-            <div class="my-4 w-full max-w-sm">
-                <label for="monthSelect" class="block text-sm font-medium text-gray-700">Pilih Bulan</label>
-                <select id="monthSelect" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
-                    <option value="0">Januari</option>
-                    <option value="1">Februari</option>
-                    <option value="2">Mac</option>
-                    <option value="3">April</option>
-                    <option value="4">Mei</option>
-                    <option value="5">Jun</option>
-                    <option value="6">Julai</option>
-                    <option value="7">Ogos</option>
-                    <option value="8">September</option>
-                    <option value="9">Oktober</option>
-                    <option value="10">November</option>
-                    <option value="11">Disember</option>
-                </select>
-            </div>
-
-            <!-- Clock In/Out -->
             <div class="my-8 w-full max-w-sm">
                 <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Clock In / Clock Out</h3>
                 <div class="p-6 bg-white rounded-lg shadow-md">
@@ -155,17 +132,32 @@
                 </div>
             </div>
 
-            <!-- Generate PDF -->
             <div class="my-8 w-full">
-                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Laporan Kehadiran Bulanan</h3>
+                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Jana Laporan Kehadiran</h3>
+                <div class="flex flex-col md:flex-row gap-4 mb-4">
+                    <select id="monthSelect" class="flex-1 p-2 rounded-md border border-gray-300">
+                        <option value="0">Januari</option>
+                        <option value="1">Februari</option>
+                        <option value="2">Mac</option>
+                        <option value="3">April</option>
+                        <option value="4">Mei</option>
+                        <option value="5">Jun</option>
+                        <option value="6">Julai</option>
+                        <option value="7">Ogos</option>
+                        <option value="8">September</option>
+                        <option value="9">Oktober</option>
+                        <option value="10">November</option>
+                        <option value="11">Disember</option>
+                    </select>
+                    <input type="number" id="yearInput" class="flex-1 p-2 rounded-md border border-gray-300" placeholder="Tahun" min="2020">
+                </div>
                 <button id="generatePdfBtn" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
                     Jana Laporan PDF
                 </button>
             </div>
 
-            <!-- Attendance Table -->
             <div class="my-8 w-full">
-                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Jadual Kehadiran</h3>
+                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Jadual Kehadiran Bulan Ini</h3>
                 <div class="table-container">
                     <table class="bg-white divide-y divide-gray-200">
                         <thead class="bg-gray-50">
@@ -191,7 +183,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAB1Lqs-9EHLFI-pnMnKwyHYogNNQq7F8A",
@@ -208,7 +200,6 @@
         const auth = getAuth(app);
         const appId = 'default-app-id';
 
-        // Koordinat pejabat
         const officeCoordinates = {
             latitude: 1.5329149992751578,
             longitude: 110.35895714753464
@@ -216,12 +207,12 @@
         const locationTolerance = 100;
 
         let userId = null;
+        let isFaceRegistered = false;
         let userData = null;
         let videoStream = null;
         let isProcessing = false;
         let faceMatcher = null;
-
-        // DOM Elements
+        
         const loginPageDiv = document.getElementById('loginPage');
         const accountRegistrationPageDiv = document.getElementById('accountRegistrationPage');
         const faceRegistrationPageDiv = document.getElementById('faceRegistrationPage');
@@ -236,6 +227,7 @@
         const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
         const locationStatusEl = document.getElementById('locationStatus');
         const monthSelect = document.getElementById('monthSelect');
+        const yearInput = document.getElementById('yearInput');
 
         window.jsPDF = window.jspdf.jsPDF;
 
@@ -244,10 +236,14 @@
             accountRegistrationPageDiv.classList.add('hidden');
             faceRegistrationPageDiv.classList.add('hidden');
             dashboardDiv.classList.add('hidden');
-            document.getElementById(pageId)?.classList.remove('hidden');
+            
+            const page = document.getElementById(pageId);
+            if (page) page.classList.remove('hidden');
+
             stopCamera();
             hideStatusMessage();
         }
+        window.showPage = showPage;
 
         function showStatusMessage(message, type = 'info') {
             statusMessageDiv.textContent = message;
@@ -286,7 +282,8 @@
                 ]);
                 return true;
             } catch (error) {
-                showStatusMessage('Gagal muat model.', 'error');
+                showStatusMessage('Gagal muat model. Semak folder weights.', 'error');
+                console.error('Model load error:', error);
                 return false;
             }
         }
@@ -300,155 +297,388 @@
                 faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
             } catch (e) {
                 console.error("Gagal cipta faceMatcher:", e);
+                showStatusMessage('Data wajah rosak. Sila daftar semula.', 'error');
             }
         }
 
-        // Pilih Bulan
-        function getStartAndEndOfMonth(month) {
-            const year = new Date().getFullYear();
-            const start = new Date(year, month, 1, 0, 0, 0);
-            const end = new Date(year, month + 1, 0, 23, 59, 59);
-            return { start, end };
+        async function registerFaceAndGetDescriptor() {
+            const detections = await faceapi.detectSingleFace(videoElement, new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks().withFaceDescriptor();
+            return detections ? Array.from(detections.descriptor) : null;
         }
 
-        // Update Jadual
-        function updateAttendanceTable(data, month) {
-            attendanceTableBody.innerHTML = '';
-            const { start, end } = getStartAndEndOfMonth(month);
-            const daysInMonth = end.getDate();
+        window.handleAccountRegistration = async function() {
+            const name = document.getElementById('registerNameInput').value.trim();
+            const department = document.getElementById('registerDepartmentInput').value.trim();
+            const email = document.getElementById('registerEmailInput').value.trim();
+            const password = document.getElementById('registerPasswordInput').value.trim();
 
-            for (let day = 1; day <= daysInMonth; day++) {
-                const currentDate = new Date(start.getFullYear(), month, day);
-                const dateStr = formatDate(currentDate);
-                const weekday = currentDate.toLocaleDateString('ms-MY', { weekday: 'long' });
+            if (!name || !department || !email || !password) {
+                showStatusMessage('Sila isi semua medan.', 'error');
+                return;
+            }
 
-                const record = data.find(item => {
-                    const itemDate = item.date.toDate();
-                    return itemDate.getDate() === day && itemDate.getMonth() === month;
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                userId = userCredential.user.uid;
+                await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data'), {
+                    name, department, faceDescriptor: null
                 });
+                showStatusMessage('Pendaftaran berjaya! Sila daftar wajah.', 'success');
+                showPage('faceRegistrationPage');
+            } catch (error) {
+                showStatusMessage(`Gagal: ${error.message}`, 'error');
+            }
+        };
 
-                const clockInTime = record?.clockIn ? new Date(record.clockIn) : null;
-                const clockInDisplay = clockInTime ? clockInTime.toLocaleTimeString('ms-MY') : '-';
-                const clockOutTime = record?.clockOut ? new Date(record.clockOut) : null;
-                const clockOutDisplay = clockOutTime ? clockOutTime.toLocaleTimeString('ms-MY') : '-';
+        window.handleEmailLogin = async function() {
+            const email = document.getElementById('loginEmailInput').value.trim();
+            const password = document.getElementById('loginPasswordInput').value.trim();
 
-                const totalHours = record?.totalHours ? record.totalHours.toFixed(2) : '-';
-                const totalOT = record?.totalOT ? record.totalOT.toFixed(2) : '-';
+            if (!email || !password) {
+                showStatusMessage('Isi e-mel dan kata laluan.', 'error');
+                return;
+            }
 
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${dateStr}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${weekday}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockInTime && (clockInTime.getHours() > 8 || (clockInTime.getHours() === 8 && clockInTime.getMinutes() > 30)) ? 'text-red-600' : ''}">${clockInDisplay}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockOutTime && clockOutTime.getHours() < 16 ? 'text-red-600' : ''}">${clockOutDisplay}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalHours}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalOT}</td>
-                `;
-                attendanceTableBody.appendChild(row);
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                if (error.code === 'auth/user-not-found') {
+                    showStatusMessage('Tiada pengguna dengan e-mel ini.', 'error');
+                } else if (error.code === 'auth/wrong-password') {
+                    showStatusMessage('Kata laluan salah.', 'error');
+                } else {
+                    showStatusMessage(`Ralat: ${error.message}`, 'error');
+                }
+            }
+        };
+
+        window.handleSignOut = async function() {
+            await signOut(auth);
+            showStatusMessage('Berjaya log keluar.', 'success');
+            showPage('loginPage');
+        };
+
+        window.handleFaceRegistration = async function() {
+            if (isProcessing) return;
+            isProcessing = true;
+            registerFaceSubmitBtn.disabled = true;
+
+            await startCamera(videoElement);
+            const modelsLoaded = await loadFaceModels();
+            if (!modelsLoaded) {
+                isProcessing = false;
+                registerFaceSubmitBtn.disabled = false;
+                return;
+            }
+
+            showStatusMessage('Mengesan wajah...', 'info');
+            let faceDescriptor = null;
+            const startTime = Date.now();
+            while (Date.now() - startTime < 5000) {
+                faceDescriptor = await registerFaceAndGetDescriptor();
+                if (faceDescriptor) break;
+                await new Promise(r => setTimeout(r, 500));
+            }
+
+            if (!faceDescriptor) {
+                showStatusMessage('Gagal kesan wajah.', 'error');
+                isProcessing = false;
+                registerFaceSubmitBtn.disabled = false;
+                return;
+            }
+
+            const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
+            await setDoc(userDocRef, { faceDescriptor: JSON.stringify(faceDescriptor) }, { merge: true });
+            isFaceRegistered = true;
+            createFaceMatcher(JSON.stringify(faceDescriptor));
+            showStatusMessage('Wajah berjaya didaftarkan!', 'success');
+            showPage('loginPage');
+            isProcessing = false;
+        };
+
+        async function handleGeolocationCheck() {
+            faceScanBtn.disabled = true;
+            locationStatusEl.textContent = 'Mengesan lokasi...';
+            try {
+                const pos = await new Promise((res, rej) => {
+                    navigator.geolocation.getCurrentPosition(res, rej, {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    });
+                });
+                const { latitude, longitude } = pos.coords;
+                const distance = calculateDistance(latitude, longitude, officeCoordinates.latitude, officeCoordinates.longitude);
+
+                if (distance <= locationTolerance) {
+                    locationStatusEl.textContent = `Di dalam kawasan pejabat (${distance.toFixed(2)}m)`;
+                    faceScanBtn.disabled = false;
+                } else {
+                    locationStatusEl.textContent = `Di luar kawasan pejabat (${distance.toFixed(2)}m)`;
+                    faceScanBtn.disabled = true;
+                }
+            } catch (e) {
+                locationStatusEl.textContent = 'Gagal akses lokasi.';
+                faceScanBtn.disabled = true;
             }
         }
 
-        // Generate PDF
+        window.handleFaceCheck = async function() {
+            if (isProcessing) return;
+            isProcessing = true;
+            faceScanBtn.disabled = true;
+            showStatusMessage('Mengimbas wajah...', 'info');
+
+            const modelsLoaded = await loadFaceModels();
+            if (!modelsLoaded) {
+                isProcessing = false;
+                return;
+            }
+
+            await startCamera(scanVideoElement);
+            try {
+                await new Promise(r => setTimeout(r, 2000));
+                const detections = await faceapi.detectSingleFace(scanVideoElement, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceLandmarks().withFaceDescriptor();
+
+                if (detections) {
+                    const match = faceMatcher.findBestMatch(detections.descriptor);
+                    if (match.label === userId && match.distance < 0.6) {
+                        await window.handleClockAction();
+                    } else {
+                        showStatusMessage('Wajah tidak sepadan.', 'error');
+                    }
+                } else {
+                    showStatusMessage('Wajah tidak dikesan.', 'error');
+                }
+            } catch (e) {
+                showStatusMessage('Ralat pengesanan.', 'error');
+            } finally {
+                isProcessing = false;
+                faceScanBtn.disabled = false;
+                stopCamera();
+            }
+        };
+
+        window.handleClockAction = async function() {
+            showStatusMessage('Mengesan lokasi sebelum menyimpan...', 'info');
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
+                });
+                const { latitude, longitude } = position.coords;
+                const distance = calculateDistance(latitude, longitude, officeCoordinates.latitude, officeCoordinates.longitude);
+
+                if (distance > locationTolerance) {
+                    showStatusMessage(`Anda berada ${distance.toFixed(2)}m dari pejabat. Gagal clock in/out.`, 'error');
+                    return;
+                }
+
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'attendance', getCurrentDate());
+                const docSnap = await getDoc(docRef);
+                const now = new Date();
+
+                if (docSnap.exists() && docSnap.data().clockIn) {
+                    const clockIn = docSnap.data().clockIn.toDate();
+                    const totalHours = (now - clockIn) / (1000 * 60 * 60);
+
+                    const clockOutTime = now.getHours() * 60 + now.getMinutes();
+                    const nominalClockOut = 17 * 60 + 30;
+                    let totalOT = 0;
+                    if (clockOutTime > nominalClockOut) {
+                        totalOT = (clockOutTime - nominalClockOut) / 60;
+                    }
+
+                    await setDoc(docRef, {
+                        clockOut: now,
+                        totalHours,
+                        totalOT,
+                        locationOut: { lat: latitude, lng: longitude }
+                    }, { merge: true });
+                    showStatusMessage('Clock Out Berjaya!', 'success');
+                } else {
+                    await setDoc(docRef, {
+                        date: now,
+                        weekday: now.toLocaleDateString('en-US', { weekday: 'long' }),
+                        clockIn: now,
+                        locationIn: { lat: latitude, lng: longitude }
+                    }, { merge: true });
+                    showStatusMessage('Clock In Berjaya!', 'success');
+                }
+                handleGeolocationCheck();
+            } catch (error) {
+                showStatusMessage('Gagal akses lokasi. Sila benarkan akses lokasi.', 'error');
+            }
+        };
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
         window.generatePDF = async function() {
-            const month = parseInt(monthSelect.value);
-            const year = new Date().getFullYear();
-            const { start, end } = getStartAndEndOfMonth(month);
+            const selectedMonth = parseInt(monthSelect.value);
+            const selectedYear = parseInt(yearInput.value);
+
+            if (isNaN(selectedYear) || selectedYear < 2020) {
+                alert('Sila masukkan tahun yang sah.');
+                return;
+            }
+
+            const startOfMonth = new Date(selectedYear, selectedMonth, 1);
+            const endOfMonth = new Date(selectedYear, selectedMonth + 1, 0);
 
             const q = query(
                 collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
-                where('date', '>=', Timestamp.fromDate(start)),
-                where('date', '<=', Timestamp.fromDate(end))
+                where('date', '>=', startOfMonth),
+                where('date', '<=', endOfMonth)
             );
-
             const snap = await getDocs(q);
-            const data = snap.docs.map(d => {
-                const docData = d.data();
-                return {
-                    id: d.id,
-                    date: docData.date.toDate(),
-                    clockIn: docData.clockIn?.toDate(),
-                    clockOut: docData.clockOut?.toDate(),
-                    totalHours: docData.totalHours || 0,
-                    totalOT: docData.totalOT || 0
-                };
-            });
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
             const doc = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
+                format: 'a4',
+                unit: 'mm'
             });
 
-            doc.setFont('times');
+            doc.setFont('times', 'normal');
+            
+            // Headers and User Info
+            const pageWidth = doc.internal.pageSize.getWidth();
             doc.setFontSize(14);
-            doc.text('Total Time Card', 105, 20, { align: 'center' });
-
-            const monthName = new Date(year, month).toLocaleDateString('ms-MY', { month: 'long' });
+            doc.setFont('times', 'bold');
+            const title = 'Total Time Card';
+            const titleWidth = doc.getTextWidth(title);
+            doc.text(title, (pageWidth - titleWidth) / 2, 20);
+            
             doc.setFontSize(10);
-            doc.text(`Bulan: ${monthName} ${year}`, 14, 30);
-            doc.text(`Nama: ${userData?.name || '-'}, Jabatan: ${userData?.department || '-'}`, 14, 35);
-
-            const headers = ["Tarikh", "Hari", "Masuk", "Keluar", "Jam", "OT"];
-            const colWidths = [25, 25, 25, 25, 20, 20];
+            doc.setFont('times', 'normal');
+            const startStr = startOfMonth.toISOString().slice(0, 10);
+            const endStr = endOfMonth.toISOString().slice(0, 10);
+            doc.text(`Start Date ${startStr} End Date ${endStr}`, 14, 30);
+            doc.text(`First Name: ${userData?.name || 'Pengguna'}, Department: ${userData?.department || 'Tiada'}`, 14, 35);
+            
+            // Table Headers
+            const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Total Hours", "Total OT"];
+            const colWidths = [30, 25, 25, 25, 25, 25];
             let y = 45;
+            let x = 14;
 
             doc.setFont('times', 'bold');
-            let x = 14;
+            doc.setDrawColor(0);
+            doc.setLineWidth(0.2);
+            
             headers.forEach((header, i) => {
                 doc.rect(x, y - 5, colWidths[i], 8);
                 doc.text(header, x + 2, y);
                 x += colWidths[i];
             });
-
+            
+            // Table Body and Data
             y += 8;
             doc.setFont('times', 'normal');
             let totalHours = 0;
             let totalOT = 0;
+            
+            for (let day = 1; day <= endOfMonth.getDate(); day++) {
+                const date = new Date(selectedYear, selectedMonth, day);
+                const dateString = date.toISOString().slice(0, 10);
+                const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
 
-            for (let day = 1; day <= end.getDate(); day++) {
-                const currentDate = new Date(year, month, day);
-                const dateStr = formatDate(currentDate);
-                const weekday = currentDate.toLocaleDateString('ms-MY', { weekday: 'long' });
+                const record = data.find(d => d.date.toDate().toISOString().slice(0, 10) === dateString) || {};
+                const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+                const clockOut = record.clockOut ? record.clockOut.toDate().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+                const hours = record.totalHours ? record.totalHours.toFixed(2) : '';
+                const ot = record.totalOT ? record.totalOT.toFixed(2) : '';
 
-                const record = data.find(item => {
-                    const itemDate = item.date;
-                    return itemDate.getDate() === day && itemDate.getMonth() === month && itemDate.getFullYear() === year;
-                });
-
-                const clockInStr = record?.clockIn ? formatTime(record.clockIn) : '-';
-                const clockOutStr = record?.clockOut ? formatTime(record.clockOut) : '-';
-                const hours = record?.totalHours?.toFixed(2) || '-';
-                const ot = record?.totalOT?.toFixed(2) || '-';
-
-                if (record?.totalHours) totalHours += record.totalHours;
-                if (record?.totalOT) totalOT += record.totalOT;
+                if (record.totalHours) totalHours += record.totalHours;
+                if (record.totalOT) totalOT += record.totalOT;
 
                 x = 14;
-                [dateStr, weekday, clockInStr, clockOutStr, hours, ot].forEach((text, i) => {
+                const rowData = [dateString, weekday, clockIn, clockOut, hours, ot];
+                
+                rowData.forEach((text, i) => {
                     doc.rect(x, y - 5, colWidths[i], 8);
-                    doc.setTextColor(0, 0, 0);
-                    doc.text(text.toString(), x + 2, y);
+                    doc.text(text, x + 2, y);
                     x += colWidths[i];
                 });
                 y += 8;
             }
 
-            doc.setFont('times', 'normal');
-            doc.text(`Jumlah Jam: ${totalHours.toFixed(2)} | Jumlah OT: ${totalOT.toFixed(2)}`, 14, y + 10);
-
-            doc.save(`Laporan_Kehadiran_${userData.name}_${year}_${month + 1}.pdf`);
+            // Statistic Row
+            y += 5;
+            doc.setFont('times', 'bold');
+            doc.rect(14, y - 5, colWidths.reduce((a, b) => a + b, 0), 8);
+            doc.text('Statistic', 16, y);
+            doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 16 + colWidths[0] + colWidths[1], y);
+            doc.text(`Total OT: ${totalOT.toFixed(2)}`, 16 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y);
+            
+            doc.save(`Laporan_Kehadiran_${selectedYear}-${selectedMonth + 1}.pdf`);
         };
 
-        function formatDate(date) {
-            return date.toISOString().split('T')[0];
+        function updateAttendanceTable(data) {
+            attendanceTableBody.innerHTML = '';
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                const date = item.date.toDate().toISOString().slice(0, 10);
+                const weekday = item.weekday;
+                
+                const clockInTime = item.clockIn ? item.clockIn.toDate() : null;
+                const clockInDisplay = clockInTime ? clockInTime.toLocaleTimeString('ms-MY') : '-';
+                const clockInClasses = [];
+                if (clockInTime) {
+                    const nominalClockInStart = new Date(clockInTime.getFullYear(), clockInTime.getMonth(), clockInTime.getDate(), 7, 30);
+                    const nominalClockInEnd = new Date(clockInTime.getFullYear(), clockInTime.getMonth(), clockInTime.getDate(), 8, 30);
+                    if (clockInTime < nominalClockInStart || clockInTime > nominalClockInEnd) {
+                        clockInClasses.push('text-red-600');
+                    }
+                }
+                
+                const clockOutTime = item.clockOut ? item.clockOut.toDate() : null;
+                const clockOutDisplay = clockOutTime ? clockOutTime.toLocaleTimeString('ms-MY') : '-';
+                const clockOutClasses = [];
+                if (clockOutTime) {
+                    const nominalClockOutStart = new Date(clockOutTime.getFullYear(), clockOutTime.getMonth(), clockOutTime.getDate(), 16, 30);
+                    if (clockOutTime < nominalClockOutStart) {
+                        clockOutClasses.push('text-red-600');
+                    }
+                }
+                
+                const totalHours = item.totalHours ? item.totalHours.toFixed(2) : '-';
+                const totalOT = item.totalOT ? item.totalOT.toFixed(2) : '-';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${weekday}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockInClasses.join(' ')}">${clockInDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${clockOutClasses.join(' ')}">${clockOutDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalHours}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalOT}</td>
+                `;
+                attendanceTableBody.appendChild(row);
+            });
         }
 
-        function formatTime(date) {
-            return date.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', hour12: true });
+        function getCurrentDate() { return new Date().toISOString().slice(0, 10); }
+        function getStartOfMonth() { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; }
+        function getEndOfMonth() { const d = new Date(); d.setMonth(d.getMonth() + 1, 0); d.setHours(23, 59, 59, 999); return d; }
+
+        function initializeUI() {
+            const now = new Date();
+            monthSelect.value = now.getMonth();
+            yearInput.value = now.getFullYear();
         }
 
         window.onload = async function() {
             await loadFaceModels();
+            initializeUI();
 
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
@@ -462,36 +692,31 @@
                         userNameDisplay.textContent = `Selamat Datang, ${userData.name}`;
 
                         if (userData.faceDescriptor) {
-                            createFaceMatcher(userData.faceDescriptor);
+                            try {
+                                JSON.parse(userData.faceDescriptor);
+                                isFaceRegistered = true;
+                                createFaceMatcher(userData.faceDescriptor);
+                            } catch (e) {
+                                console.error("faceDescriptor rosak");
+                                isFaceRegistered = false;
+                            }
                         }
 
                         const q = query(
-                            collection(db, 'artifacts', appId, 'users', userId, 'attendance')
+                            collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
+                            where('date', '>=', getStartOfMonth()),
+                            where('date', '<=', getEndOfMonth())
                         );
-
                         onSnapshot(q, snap => {
                             const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                            const selectedMonth = parseInt(monthSelect.value);
-                            updateAttendanceTable(data, selectedMonth);
+                            updateAttendanceTable(data);
                         });
 
-                        monthSelect.addEventListener('change', () => {
-                            const selectedMonth = parseInt(monthSelect.value);
-                            const q = query(
-                                collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
-                                where('date', '>=', Timestamp.fromDate(new Date(new Date().getFullYear(), selectedMonth, 1))),
-                                where('date', '<=', Timestamp.fromDate(new Date(new Date().getFullYear(), selectedMonth + 1, 0)))
-                            );
-                            getDocs(q).then(snap => {
-                                const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                                updateAttendanceTable(data, selectedMonth);
-                            });
-                        });
-
-                        if (!userData.faceDescriptor) {
+                        if (!isFaceRegistered) {
                             showPage('faceRegistrationPage');
                         } else {
                             showPage('dashboard');
+                            handleGeolocationCheck();
                         }
                     } else {
                         showPage('faceRegistrationPage');
@@ -502,27 +727,17 @@
             });
         };
 
-        // Event Listeners
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('loginBtn').addEventListener('click', () => {
-                const email = document.getElementById('loginEmailInput').value.trim();
-                const password = document.getElementById('loginPasswordInput').value.trim();
-                if (email && password) signInWithEmailAndPassword(auth, email, password);
-            });
+            document.getElementById('loginBtn').addEventListener('click', window.handleEmailLogin);
             document.getElementById('goToRegisterBtn').addEventListener('click', () => showPage('accountRegistrationPage'));
-            document.getElementById('registerAccountBtn').addEventListener('click', handleAccountRegistration);
+            document.getElementById('registerAccountBtn').addEventListener('click', window.handleAccountRegistration);
             document.getElementById('backToLoginBtn').addEventListener('click', () => showPage('loginPage'));
-            document.getElementById('registerFaceSubmitBtn').addEventListener('click', handleFaceRegistration);
+            document.getElementById('registerFaceSubmitBtn').addEventListener('click', window.handleFaceRegistration);
             document.getElementById('returnToLoginBtn').addEventListener('click', () => showPage('loginPage'));
-            document.getElementById('faceScanBtn').addEventListener('click', handleFaceCheck);
+            document.getElementById('faceScanBtn').addEventListener('click', window.handleFaceCheck);
             document.getElementById('generatePdfBtn').addEventListener('click', window.generatePDF);
-            document.getElementById('signOutBtn').addEventListener('click', () => signOut(auth));
+            document.getElementById('signOutBtn').addEventListener('click', window.handleSignOut);
         });
-
-        // Helper Functions (Login, Face, etc.) tetap sama
-        async function handleAccountRegistration() { /* ... */ }
-        async function handleFaceRegistration() { /* ... */ }
-        async function handleFaceCheck() { /* ... */ }
     </script>
 </body>
 </html>

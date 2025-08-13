@@ -461,16 +461,23 @@
     const year = now.getFullYear();
     const month = now.getMonth();
 
-    // Fix: Correct start and end dates for current month
+    // PERBAIKAN UTAMA: Cara yang benar untuk mendapatkan awal dan akhir bulan
     const startOfMonth = new Date(year, month, 1);
-    const endOfMonth = new Date(year, month + 1, 0); // Last day of current month
-    const daysInMonth = endOfMonth.getDate(); // Get actual days in month (28-31)
+    const endOfMonth = new Date(year, month + 1, 0); // Hari terakhir bulan ini
+    
+    // Pastikan waktu di-set ke awal hari (00:00:00) untuk start dan akhir hari (23:59:59) untuk end
+    startOfMonth.setHours(0, 0, 0, 0);
+    endOfMonth.setHours(23, 59, 59, 999);
+
+    console.log("Start of Month:", startOfMonth);
+    console.log("End of Month:", endOfMonth);
 
     const q = query(
         collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
         where('date', '>=', startOfMonth),
         where('date', '<=', endOfMonth)
     );
+    
     const snap = await getDocs(q);
     const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 

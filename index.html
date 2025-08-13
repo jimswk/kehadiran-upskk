@@ -529,70 +529,63 @@
         const year = now.getFullYear();
         const month = now.getMonth();
 
-        // 1. Tentukan range tanggal dengan UTC untuk query
-        const startUTC = new Date(Date.UTC(year, month, 1, 0, 0, 0));
-        const endUTC = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59));
+        // 1. Tentukan range tanggal yang benar (1-31 Agustus)
+        const startOfMonth = new Date(year, month, 1, 0, 0, 0);
+        const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59); // Tanggal terakhir bulan ini
 
-        // 2. Format tampilan dengan timezone Malaysia (GMT+8)
-        const startDisplay = new Date(startUTC);
-        const endDisplay = new Date(endUTC);
-        startDisplay.setHours(startDisplay.getHours() + 8);
-        endDisplay.setHours(endDisplay.getHours() + 8);
+        console.log("Tanggal Awal:", startOfMonth);
+        console.log("Tanggal Akhir:", endOfMonth);
 
-        console.log("Query UTC:", startUTC, "to", endUTC);
-        console.log("Tampilan Local:", startDisplay, "to", endDisplay);
-
-        // 3. Query Firestore dengan UTC
+        // 2. Query Firestore
         const q = query(
             collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
-            where('date', '>=', startUTC),
-            where('date', '<=', endUTC)
+            where('date', '>=', startOfMonth),
+            where('date', '<=', endOfMonth)
         );
         
         const snap = await getDocs(q);
         const data = snap.docs.map(d => {
             const docData = d.data();
-            const date = new Date(docData.date.toDate());
-            date.setHours(date.getHours() + 8); // Konversi ke GMT+8
-            
             return {
                 id: d.id,
-                date: date,
-                clockIn: docData.clockIn ? new Date(docData.clockIn.toDate().getTime() + 28800000) : null,
-                clockOut: docData.clockOut ? new Date(docData.clockOut.toDate().getTime() + 28800000) : null,
+                date: docData.date.toDate(),
+                clockIn: docData.clockIn?.toDate(),
+                clockOut: docData.clockOut?.toDate(),
                 totalHours: docData.totalHours || 0,
                 totalOT: docData.totalOT || 0
             };
         });
 
-        console.log("Data after processing:", data);
+        // 3. Buat PDF
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
 
-        // 4. Buat PDF hanya dengan data Agustus
-        const filteredData = data.filter(item => 
-            item.date.getMonth() === month && 
-            item.date.getFullYear() === year
-        );
-
-        const doc = new jsPDF();
+        // 4. Header
         doc.setFont('helvetica');
-
-        // 5. Header dengan tanggal yang benar
         doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
         doc.text('Total Time Card', 105, 20, { align: 'center' });
         
         doc.setFontSize(10);
-        doc.text(`Start Date ${formatDate(startDisplay)} End Date ${formatDate(endDisplay)}`, 14, 30);
+        doc.text(`Start Date ${formatDate(startOfMonth)} End Date ${formatDate(endOfMonth)}`, 14, 30);
         doc.text(`Nama: ${userData?.name || '-'}, Jabatan: ${userData?.department || '-'}`, 14, 35);
 
-        // 6. Buat tabel
+        // 5. Buat tabel dengan border dan warna
         const headers = ["Tarikh", "Hari", "Masuk", "Keluar", "Jam", "OT"];
         const colWidths = [25, 20, 25, 25, 15, 15];
         let y = 45;
         
-        // Header tabel
+        // Header tabel dengan border
         doc.setFont('helvetica', 'bold');
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.2);
+        
         let x = 14;
         headers.forEach((header, i) => {
+            doc.rect(x, y-8, colWidths[i], 10);
             doc.text(header, x + 2, y);
             x += colWidths[i];
         });
@@ -601,17 +594,14 @@
         y += 10;
         doc.setFont('helvetica', 'normal');
         
-        // Urutkan data berdasarkan tanggal
-        filteredData.sort((a, b) => a.date - b.date);
-        
-        // Tampilkan hanya hari dalam bulan Agustus
-        for (let day = 1; day <= endDisplay.getDate(); day++) {
+        for (let day = 1; day <= endOfMonth.getDate(); day++) {
             const currentDate = new Date(year, month, day);
             const dateStr = formatDate(currentDate);
             const weekday = currentDate.toLocaleDateString('ms-MY', { weekday: 'long' });
             
-            const record = filteredData.find(item => 
-                item.date.getDate() === day
+            const record = data.find(item => 
+                item.date.getDate() === day && 
+                item.date.getMonth() === month
             );
             
             const clockIn = record?.clockIn;
@@ -621,29 +611,49 @@
             const clockInStr = clockIn ? formatTime(clockIn) : '-';
             const clockOutStr = clockOut ? formatTime(clockOut) : '-';
             
+            // Validasi waktu (Masuk setelah 8:30, Keluar sebelum 16:30)
+            const isLate = clockIn && (clockIn.getHours() > 8 || (clockIn.getHours() === 8 && clockIn.getMinutes() > 30));
+            const isEarly = clockOut && (clockOut.getHours() < 16 || (clockOut.getHours() === 16 && clockOut.getMinutes() < 30));
+            
             const hours = record?.totalHours?.toFixed(2) || '-';
             const ot = record?.totalOT?.toFixed(2) || '-';
 
-            // Gambar baris
+            // Gambar baris dengan border
             x = 14;
             [dateStr, weekday, clockInStr, clockOutStr, hours, ot].forEach((text, i) => {
+                doc.rect(x, y-8, colWidths[i], 10);
+                
+                // Warna merah untuk keterlambatan/pulang awal
+                if ((i === 2 && isLate) || (i === 3 && isEarly)) {
+                    doc.setTextColor(255, 0, 0);
+                } else {
+                    doc.setTextColor(0, 0, 0);
+                }
+                
                 doc.text(text.toString(), x + 2, y);
                 x += colWidths[i];
             });
             
             y += 10;
+            
+            // Jika hampir penuh, buat halaman baru
+            if (y > 270) {
+                doc.addPage();
+                y = 20;
+            }
         }
 
         doc.save(`Laporan_Kehadiran_${userData.name}_${year}_${month+1}.pdf`);
 
     } catch (error) {
-        console.error("PDF Error:", error);
-        showStatusMessage('Ralat: ' + error.message, 'error');
+        console.error("Error:", error);
+        showStatusMessage('Gagal membuat laporan: ' + error.message, 'error');
     }
 
     // Fungsi pembantu
     function formatDate(date) {
-        return date.toLocaleDateString('en-CA'); // YYYY-MM-DD
+        const d = new Date(date);
+        return d.toISOString().split('T')[0]; // YYYY-MM-DD
     }
     
     function formatTime(date) {

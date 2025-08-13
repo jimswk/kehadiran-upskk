@@ -135,21 +135,14 @@
             <div class="my-8 w-full">
                 <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Jana Laporan Kehadiran</h3>
                 <div class="flex flex-col md:flex-row gap-4 mb-4">
-                    <select id="monthSelect" class="flex-1 p-2 rounded-md border border-gray-300">
-                        <option value="0">Januari</option>
-                        <option value="1">Februari</option>
-                        <option value="2">Mac</option>
-                        <option value="3">April</option>
-                        <option value="4">Mei</option>
-                        <option value="5">Jun</option>
-                        <option value="6">Julai</option>
-                        <option value="7">Ogos</option>
-                        <option value="8">September</option>
-                        <option value="9">Oktober</option>
-                        <option value="10">November</option>
-                        <option value="11">Disember</option>
-                    </select>
-                    <input type="number" id="yearInput" class="flex-1 p-2 rounded-md border border-gray-300" placeholder="Tahun" min="2020">
+                    <div class="flex-1">
+                        <label for="startDateInput" class="block text-sm font-medium text-gray-700">Tarikh Mula</label>
+                        <input type="date" id="startDateInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                    </div>
+                    <div class="flex-1">
+                        <label for="endDateInput" class="block text-sm font-medium text-gray-700">Tarikh Tamat</label>
+                        <input type="date" id="endDateInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                    </div>
                 </div>
                 <button id="generatePdfBtn" class="w-full py-3 px-6 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
                     Jana Laporan PDF
@@ -226,8 +219,8 @@
         const faceScanBtn = document.getElementById('faceScanBtn');
         const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
         const locationStatusEl = document.getElementById('locationStatus');
-        const monthSelect = document.getElementById('monthSelect');
-        const yearInput = document.getElementById('yearInput');
+        const startDateInput = document.getElementById('startDateInput');
+        const endDateInput = document.getElementById('endDateInput');
 
         window.jsPDF = window.jspdf.jsPDF;
 
@@ -523,23 +516,37 @@
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return R * c;
         }
-
+        
+        function formatDecimalToTime(decimalHours) {
+            if (decimalHours === null || isNaN(decimalHours) || decimalHours === 0) {
+                return '';
+            }
+            const hours = Math.floor(decimalHours);
+            const minutes = Math.round((decimalHours - hours) * 60);
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        }
+        
         window.generatePDF = async function() {
-            const selectedMonth = parseInt(monthSelect.value);
-            const selectedYear = parseInt(yearInput.value);
+            const startDateStr = startDateInput.value;
+            const endDateStr = endDateInput.value;
 
-            if (isNaN(selectedYear) || selectedYear < 2020) {
-                alert('Sila masukkan tahun yang sah.');
+            if (!startDateStr || !endDateStr) {
+                alert('Sila masukkan Tarikh Mula dan Tarikh Tamat.');
                 return;
             }
 
-            const startOfMonth = new Date(selectedYear, selectedMonth, 1);
-            const endOfMonth = new Date(selectedYear, selectedMonth + 1, 0);
+            const start = new Date(startDateStr);
+            const end = new Date(endDateStr);
+
+            if (start > end) {
+                alert('Tarikh Mula tidak boleh melebihi Tarikh Tamat.');
+                return;
+            }
 
             const q = query(
                 collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
-                where('date', '>=', startOfMonth),
-                where('date', '<=', endOfMonth)
+                where('date', '>=', start),
+                where('date', '<=', end)
             );
             const snap = await getDocs(q);
             const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -552,8 +559,7 @@
             doc.setFont('times', 'normal');
             
             const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
-            const tableWidth = 180; // Lebar jadual penuh untuk margin seimbang
+            const tableWidth = 180;
             const tableMarginX = (pageWidth - tableWidth) / 2;
             const rowHeight = 6;
             const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Total Hours", "Total OT"];
@@ -570,9 +576,7 @@
             y += 10;
             doc.setFontSize(10);
             doc.setFont('times', 'normal');
-            const startStr = startOfMonth.toISOString().slice(0, 10);
-            const endStr = endOfMonth.toISOString().slice(0, 10);
-            doc.text(`Start Date ${startStr} End Date ${endStr}`, tableMarginX, y);
+            doc.text(`Start Date ${startDateStr} End Date ${endDateStr}`, tableMarginX, y);
             y += 5;
             doc.text(`First Name: ${userData?.name || 'Pengguna'}, Department: ${userData?.department || 'Tiada'}`, tableMarginX, y);
 
@@ -593,10 +597,10 @@
             let totalHoursDecimal = 0;
             let totalOTDecimal = 0;
             
-            for (let day = 1; day <= endOfMonth.getDate(); day++) {
-                const date = new Date(selectedYear, selectedMonth, day);
-                const dateString = date.toISOString().slice(0, 10);
-                const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+            const currentDate = new Date(start);
+            while (currentDate <= end) {
+                const dateString = currentDate.toISOString().slice(0, 10);
+                const weekday = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
 
                 const record = data.find(d => d.date.toDate().toISOString().slice(0, 10) === dateString) || {};
                 const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
@@ -618,10 +622,10 @@
                     x += colWidths[i];
                 });
                 y += rowHeight;
+                currentDate.setDate(currentDate.getDate() + 1);
             }
 
             // Baris Statistik dalam jadual
-            y += 1;
             doc.setFont('times', 'bold');
             doc.rect(tableMarginX, y, tableWidth, rowHeight);
             
@@ -633,7 +637,7 @@
             doc.text(totalHoursFormatted, tableMarginX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 2, y + 4);
             doc.text(totalOTFormatted, tableMarginX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + 2, y + 4);
             
-            doc.save(`Laporan_Kehadiran_${selectedYear}-${selectedMonth + 1}.pdf`);
+            doc.save(`Laporan_Kehadiran_${startDateStr}_to_${endDateStr}.pdf`);
         };
 
         function updateAttendanceTable(data) {
@@ -679,24 +683,17 @@
             });
         }
 
-        // Fungsi utiliti untuk menukar format perpuluhan kepada HH:mm
-        function formatDecimalToTime(decimalHours) {
-            if (decimalHours === null || isNaN(decimalHours)) {
-                return '';
-            }
-            const hours = Math.floor(decimalHours);
-            const minutes = Math.round((decimalHours - hours) * 60);
-            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-        }
-
         function getCurrentDate() { return new Date().toISOString().slice(0, 10); }
         function getStartOfMonth() { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; }
         function getEndOfMonth() { const d = new Date(); d.setMonth(d.getMonth() + 1, 0); d.setHours(23, 59, 59, 999); return d; }
 
         function initializeUI() {
             const now = new Date();
-            monthSelect.value = now.getMonth();
-            yearInput.value = now.getFullYear();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+            
+            startDateInput.value = startOfMonth;
+            endDateInput.value = endOfMonth;
         }
 
         window.onload = async function() {

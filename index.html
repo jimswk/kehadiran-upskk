@@ -305,19 +305,18 @@
 
         // Memuat model Face-API.js
         async function loadFaceModels() {
-            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/weights';
-            showStatusMessage('Memuatkan model pengecaman wajah...', 'info');
+            const MODEL_URL = 'https://raw.githubusercontent.com/jimswk/kehadiran-upskk/main/weights';
             try {
                 await Promise.all([
-                    faceapi.nets.tinyFaceDetector.load(MODEL_URL),
-                    faceapi.nets.faceLandmark68Net.load(MODEL_URL),
-                    faceapi.nets.faceRecognitionNet.load(MODEL_URL)
+                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
                 ]);
-                showStatusMessage('Model pengecaman wajah berjaya dimuatkan.', 'success');
+                showStatusMessage('Model wajah berjaya dimuatkan.', 'success');
                 return true;
             } catch (error) {
-                showStatusMessage('Gagal memuatkan model pengecaman wajah.', 'error');
-                console.error('Error loading face-api models:', error);
+                showStatusMessage('Gagal muat model. Sila semak sambungan.', 'error');
+                console.error('Model load error:', error);
                 return false;
             }
         }

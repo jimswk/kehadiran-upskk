@@ -524,153 +524,163 @@
 
         // Jana PDF mengikut format DOCX
         window.generatePDF = async function() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
+    try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
 
-    // Fix: Correct start and end dates for current month
-    const startOfMonth = new Date(year, month, 1);
-    const endOfMonth = new Date(year, month + 1, 0); // Last day of current month
-    const daysInMonth = endOfMonth.getDate(); // Get actual days in month (28-31)
+        // 1. Tentukan rentang tanggal yang benar (1-31 Agustus 2025)
+        const startOfMonth = new Date(year, month, 1, 0, 0, 0);
+        const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59); // Hari terakhir bulan ini
 
-    const q = query(
-        collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
-        where('date', '>=', startOfMonth),
-        where('date', '<=', endOfMonth)
-    );
-    const snap = await getDocs(q);
-    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        console.log("Tanggal Awal Bulan:", startOfMonth);
+        console.log("Tanggal Akhir Bulan:", endOfMonth);
 
-    const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-    });
+        // 2. Ambil data dari Firestore
+        const q = query(
+            collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
+            where('date', '>=', startOfMonth),
+            where('date', '<=', endOfMonth)
+        );
+        
+        const snap = await getDocs(q);
+        const data = snap.docs.map(d => {
+            const docData = d.data();
+            return {
+                id: d.id,
+                date: docData.date.toDate(),
+                clockIn: docData.clockIn?.toDate(),
+                clockOut: docData.clockOut?.toDate(),
+                totalHours: docData.totalHours || 0,
+                totalOT: docData.totalOT || 0,
+                weekday: docData.weekday
+            };
+        });
 
-    // Use standard helvetica font to avoid loading issues
-    doc.setFont('times', 'normal');
+        console.log("Data Kehadiran:", data);
 
-    // Headers and User Info
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    // Title
-    doc.setFontSize(14);
-    doc.setFont('times', 'bold');
-    const title = 'Total Time Card';
-    const titleWidth = doc.getTextWidth(title);
-    doc.text(title, (pageWidth - titleWidth) / 2, 20);
-    
-    // Date range and user info
-    doc.setFontSize(10);
-    doc.setFont('times', 'normal');
-    const startStr = formatDate(startOfMonth);
-    const endStr = formatDate(endOfMonth);
-    doc.text(`Start Date ${startStr} End Date ${endStr}`, 14, 30);
-    doc.text(`First Name: ${userData?.name || 'N/A'}, Department: ${userData?.department || 'N/A'}`, 14, 35);
-    
-    // Table setup
-    const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Total Hours", "Total OT"];
-    const colWidths = [25, 25, 25, 25, 25, 25];
-    let y = 45;
-    
-    // Table headers
-    doc.setFont('times', 'normal');
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.2);
-    
-    let x = 14;
-    headers.forEach((header, i) => {
-        doc.rect(x, y - 5, colWidths[i], 8);
-        doc.text(header, x + 2, y);
-        x += colWidths[i];
-    });
-    
-    // Table data
-    y += 8;
-    doc.setFont('times', 'normal');
-    let totalHours = 0;
-    let totalOT = 0;
-    
-    // Process each day of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-        const currentDate = new Date(year, month, day);
-        const dateStr = formatDate(currentDate);
-        const weekday = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
-        
-        // Find attendance record for this date
-        const record = data.find(d => {
-            const recordDate = d.date.toDate();
-            return recordDate.getDate() === day && 
-                   recordDate.getMonth() === month && 
-                   recordDate.getFullYear() === year;
-        }) || {};
-        
-        // Format times
-        const clockIn = record.clockIn ? record.clockIn.toDate() : null;
-        const clockOut = record.clockOut ? record.clockOut.toDate() : null;
-        
-        const clockInStr = clockIn ? formatTime(clockIn) : '';
-        const clockOutStr = clockOut ? formatTime(clockOut) : '';
-        
-        // Check for late clock in (after 8:30 AM)
-        const isLateClockIn = clockIn ? 
-            (clockIn.getHours() > 8 || (clockIn.getHours() === 8 && clockIn.getMinutes() > 30)) : 
-            false;
-        
-        // Check for early clock out (before 4:30 PM)
-        const isEarlyClockOut = clockOut ? 
-            (clockOut.getHours() < 16 || (clockOut.getHours() === 16 && clockOut.getMinutes() < 30)) : 
-            false;
-        
-        const hours = record.totalHours ? record.totalHours.toFixed(2) : '';
-        const ot = record.totalOT ? record.totalOT.toFixed(2) : '';
-        
-        if (record.totalHours) totalHours += record.totalHours;
-        if (record.totalOT) totalOT += record.totalOT;
+        // 3. Buat dokumen PDF
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
 
-        // Draw row
-        x = 14;
-        [dateStr, weekday, clockInStr, clockOutStr, hours, ot].forEach((text, i) => {
+        // Gunakan font standar
+        doc.setFont('times', 'normal');
+
+        // 4. Header Laporan
+        const pageWidth = doc.internal.pageSize.getWidth();
+        doc.setFontSize(14);
+        doc.setFont('times', 'bold');
+        const title = 'Total Time Card';
+        doc.text(title, (pageWidth - doc.getTextWidth(title)) / 2, 20);
+        
+        // 5. Info Pengguna dan Periode
+        doc.setFontSize(10);
+        doc.setFont('times', 'normal');
+        doc.text(`Start Date ${formatDate(startOfMonth)} End Date ${formatDate(endOfMonth)}`, 14, 30);
+        doc.text(`First Name: ${userData?.name || '-'}, Department: ${userData?.department || '-'}`, 14, 35);
+
+        // 6. Buat Tabel
+        const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Total Hours", "Total OT"];
+        const colWidths = [25, 25, 25, 25, 25, 25];
+        let y = 45;
+        
+        // Header Tabel
+        doc.setFont('times', 'normal');
+        let x = 14;
+        headers.forEach((header, i) => {
             doc.rect(x, y - 5, colWidths[i], 8);
-            
-            // Set red color for late/early entries
-            if ((i === 2 && isLateClockIn) || (i === 3 && isEarlyClockOut)) {
-                doc.setTextColor(255, 0, 0);
-            } else {
-                doc.setTextColor(0, 0, 0);
-            }
-            
-            doc.text(text, x + 2, y);
+            doc.text(header, x + 2, y);
             x += colWidths[i];
         });
         
+        // Isi Tabel
         y += 8;
+        doc.setFont('times', 'normal');
+        let totalHours = 0;
+        let totalOT = 0;
         
-        // Add new page if needed
-        if (y > 250 && day < daysInMonth) {
-            doc.addPage();
-            y = 20;
+        const daysInMonth = endOfMonth.getDate();
+        for (let day = 1; day <= daysInMonth; day++) {
+            const currentDate = new Date(year, month, day);
+            const dateStr = formatDate(currentDate);
+            const weekday = currentDate.toLocaleDateString('ms-MY', { weekday: 'long' });
+            
+            // Cari data untuk tanggal ini
+            const record = data.find(item => {
+                const itemDate = item.date;
+                return itemDate.getDate() === day && 
+                       itemDate.getMonth() === month && 
+                       itemDate.getFullYear() === year;
+            });
+            
+            // Format waktu
+            const clockIn = record?.clockIn;
+            const clockOut = record?.clockOut;
+            
+            const clockInStr = clockIn ? formatTime(clockIn) : '-';
+            const clockOutStr = clockOut ? formatTime(clockOut) : '-';
+            
+            // Validasi waktu
+            const isLateClockIn = clockIn ? 
+                (clockIn.getHours() > 8 || (clockIn.getHours() === 8 && clockIn.getMinutes() > 30)) : 
+                false;
+            
+            const isEarlyClockOut = clockOut ? 
+                (clockOut.getHours() < 16 || (clockOut.getHours() === 16 && clockOut.getMinutes() < 30)) : 
+                false;
+            
+            const hours = record?.totalHours?.toFixed(2) || '-';
+            const ot = record?.totalOT?.toFixed(2) || '-';
+
+            if (record?.totalHours) totalHours += record.totalHours;
+            if (record?.totalOT) totalOT += record.totalOT;
+
+            // Gambar baris tabel
+            x = 14;
+            [dateStr, weekday, clockInStr, clockOutStr, hours, ot].forEach((text, i) => {
+                doc.rect(x, y - 5, colWidths[i], 8);
+                
+                // Warna merah untuk keterlambatan/pulang awal
+                if ((i === 2 && isLateClockIn) || (i === 3 && isEarlyClockOut)) {
+                    doc.setTextColor(255, 0, 0);
+                } else {
+                    doc.setTextColor(0, 0, 0);
+                }
+                
+                doc.text(text.toString(), x + 2, y);
+                x += colWidths[i];
+            });
+            
+            y += 8;
         }
+
+        // 7. Baris Statistik
+        y += 5;
+        doc.setFont('times', 'normal');
+        doc.rect(14, y - 5, colWidths.reduce((a, b) => a + b, 0), 8);
+        doc.text('Statistic', 16, y);
+        doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 16 + colWidths[0] + colWidths[1], y);
+        doc.text(`Total OT: ${totalOT.toFixed(2)}`, 16 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y);
+        
+        // 8. Simpan PDF
+        doc.save(`Laporan_Kehadiran_${userData?.name || 'User'}_${year}_${month + 1}.pdf`);
+
+    } catch (error) {
+        console.error("Error generating PDF:", error);
+        showStatusMessage('Gagal membuat laporan PDF: ' + error.message, 'error');
     }
 
-    // Statistics row
-    y += 5;
-    doc.setFont('times', 'normal');
-    doc.rect(14, y - 5, colWidths.reduce((a, b) => a + b, 0), 8);
-    doc.text('Statistic', 16, y);
-    doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 16 + colWidths[0] + colWidths[1], y);
-    doc.text(`Total OT: ${totalOT.toFixed(2)}`, 16 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y);
-    
-    // Save PDF
-    doc.save(`Attendance_Report_${year}_${month + 1}.pdf`);
-
-    // Helper functions
+    // Fungsi pembantu
     function formatDate(date) {
-        return date.toISOString().split('T')[0]; // YYYY-MM-DD
+        const d = new Date(date);
+        return d.toISOString().split('T')[0]; // YYYY-MM-DD
     }
     
     function formatTime(date) {
-        return date.toLocaleTimeString('en-US', { 
+        return date.toLocaleTimeString('ms-MY', { 
             hour: '2-digit', 
             minute: '2-digit',
             hour12: true 

@@ -6,10 +6,8 @@
     <title>Sistem Perakam Waktu UPSKK</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- jsPDF -->
+    <!-- jsPDF dengan Times New Roman -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- QR Code -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <!-- face-api.js -->
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
@@ -131,25 +129,13 @@
                 <p class="text-sm text-gray-500" id="userIdDisplay"></p>
             </div>
 
-            <div id="scanModeContainer" class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
-                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Clock In/Out</h3>
-                <div id="faceScanMode">
-                    <p class="mb-4 text-center text-gray-600" id="locationStatus">Mengesan lokasi...</p>
+            <div class="my-8 w-full max-w-sm">
+                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Clock In / Clock Out</h3>
+                <div class="p-6 bg-white rounded-lg shadow-md">
                     <video id="scanVideoElement" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
-                    <button id="faceScanBtn" class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button id="faceScanBtn" class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
                         Clock In / Clock Out
                     </button>
-                </div>
-            </div>
-
-            <div class="my-8 w-full max-w-sm">
-                <h3 class="text-xl font-bold mb-2 text-center text-gray-800">QR Code Anda</h3>
-                <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-inner">
-                    <p class="text-sm text-gray-600 mb-2">QR code ini unik untuk akaun anda.</p>
-                    <canvas id="qrCodeCanvas" class="border rounded-lg bg-white p-2"></canvas>
-                    <a id="downloadQrBtn" class="mt-4 w-full py-2 px-4 text-center text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200 cursor-pointer">
-                        Muat Turun QR Code
-                    </a>
                 </div>
             </div>
 
@@ -206,10 +192,6 @@
         const auth = getAuth(app);
         const appId = 'default-app-id';
 
-        // Koordinat pejabat
-        const officeCoordinates = { latitude: 1.5329441784687154, longitude: 110.35915174578312 };
-        const locationTolerance = 100;
-
         // Global variables
         let userId = null;
         let isFaceRegistered = false;
@@ -217,7 +199,6 @@
         let videoStream = null;
         let isProcessing = false;
         let faceMatcher = null;
-        let faceDetectionInterval = null;
 
         // DOM Elements
         const loginPageDiv = document.getElementById('loginPage');
@@ -227,23 +208,14 @@
         const statusMessageDiv = document.getElementById('statusMessage');
         const videoElement = document.getElementById('videoElement');
         const scanVideoElement = document.getElementById('scanVideoElement');
-        const canvasElement = document.getElementById('canvasElement');
         const attendanceTableBody = document.getElementById('attendanceTableBody');
         const userNameDisplay = document.getElementById('userName');
         const userIdDisplay = document.getElementById('userIdDisplay');
         const faceScanBtn = document.getElementById('faceScanBtn');
         const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
-        const locationStatusEl = document.getElementById('locationStatus');
 
         // Pastikan jsPDF tersedia
         window.jsPDF = window.jspdf.jsPDF;
-
-        // Shifts
-        const shifts = [
-            { start: { hour: 7, minute: 30 }, end: { hour: 16, minute: 30 } },
-            { start: { hour: 8, minute: 0 }, end: { hour: 17, minute: 0 } },
-            { start: { hour: 8, minute: 30 }, end: { hour: 17, minute: 30 } }
-        ];
 
         // Fungsi: Paparan halaman
         function showPage(pageId) {
@@ -258,19 +230,7 @@
             stopCamera();
             hideStatusMessage();
         }
-        window.showPage = showPage; // 🔴 Penting: untuk akses dalam module
-
-        // Fungsi: Kira jarak
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3;
-            const φ1 = lat1 * Math.PI / 180;
-            const φ2 = lat2 * Math.PI / 180;
-            const Δφ = (lat2 - lat1) * Math.PI / 180;
-            const Δλ = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        }
+        window.showPage = showPage;
 
         function showStatusMessage(message, type = 'info') {
             statusMessageDiv.textContent = message;
@@ -301,16 +261,13 @@
 
         // Muat model face-api.js
         async function loadFaceModels() {
-            // ✅ Ganti dengan URL sebenar anda
             const MODEL_URL = 'https://cdn.jsdelivr.net/gh/jimswk/kehadiran-upskk@main/weights';
-
             try {
                 await Promise.all([
                     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
                     faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
                     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
                 ]);
-                showStatusMessage('Model wajah berjaya dimuatkan.', 'success');
                 return true;
             } catch (error) {
                 showStatusMessage('Gagal muat model. Semak folder weights.', 'error');
@@ -432,28 +389,6 @@
             isProcessing = false;
         };
 
-        // Cek Lokasi
-        async function handleGeolocationCheck() {
-            faceScanBtn.disabled = true;
-            locationStatusEl.textContent = 'Dapatkan lokasi...';
-            try {
-                const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true }));
-                const { latitude, longitude } = pos.coords;
-                const distance = calculateDistance(latitude, longitude, officeCoordinates.latitude, officeCoordinates.longitude);
-
-                if (distance <= locationTolerance) {
-                    locationStatusEl.textContent = `Di dalam pejabat (${distance.toFixed(2)}m)`;
-                    faceScanBtn.disabled = false;
-                } else {
-                    locationStatusEl.textContent = `Di luar pejabat (${distance.toFixed(2)}m)`;
-                    faceScanBtn.disabled = true;
-                }
-            } catch (e) {
-                locationStatusEl.textContent = 'Gagal akses lokasi.';
-                faceScanBtn.disabled = true;
-            }
-        }
-
         // Pengecaman Wajah untuk Clock In/Out
         window.handleFaceCheck = async function() {
             if (isProcessing) return;
@@ -492,7 +427,7 @@
             }
         };
 
-        // Clock In/Out Action
+        // Clock In/Out Action (tanpa lokasi)
         window.handleClockAction = async function() {
             const docRef = doc(db, 'artifacts', appId, 'users', userId, 'attendance', getCurrentDate());
             const docSnap = await getDoc(docRef);
@@ -513,34 +448,81 @@
                 }, { merge: true });
                 showStatusMessage('Clock In Berjaya!', 'success');
             }
-            handleGeolocationCheck();
         };
 
-        // Jana PDF
+        // Jana PDF mengikut format DOCX
         window.generatePDF = async function() {
-            const start = getStartOfMonth();
-            const end = getEndOfMonth();
+            const startOfMonth = getStartOfMonth();
+            const endOfMonth = getEndOfMonth();
             const q = query(
                 collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
-                where('date', '>=', start),
-                where('date', '<=', end)
+                where('date', '>=', startOfMonth),
+                where('date', '<=', endOfMonth)
             );
             const snap = await getDocs(q);
             const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-            const doc = new jsPDF('p', 'mm', 'a4');
-            doc.setFont('helvetica');
-            doc.setFontSize(14);
-            doc.text('Laporan Kehadiran', 14, 20);
-            doc.setFontSize(10);
-            doc.text(`Nama: ${userData?.name || 'Pengguna'}`, 14, 30);
-            doc.text(`Jabatan: ${userData?.department || 'Tiada'}`, 14, 35);
-
-            let y = 50;
-            data.forEach(item => {
-                doc.text(item.date.toDate().toISOString().slice(0, 10), 14, y);
-                y += 5;
+            // Gunakan Times New Roman
+            const doc = new jsPDF({
+                format: 'a4',
+                unit: 'mm'
             });
+
+            // Font Times New Roman
+            doc.setFont('times', 'normal');
+
+            // Title
+            doc.setFontSize(14);
+            doc.setFont('times', 'bold');
+            doc.text('Total Time Card', 14, 20);
+
+            // Start & End Date
+            doc.setFont('times', 'normal');
+            doc.setFontSize(10);
+            const startStr = startOfMonth.toISOString().slice(0, 10);
+            const endStr = endOfMonth.toISOString().slice(0, 10);
+            doc.text(`Start Date ${startStr} End Date ${endStr}`, 14, 30);
+
+            // Name & Department
+            doc.text(`First Name: ${userData?.name || 'Pengguna'}, Department: ${userData?.department || 'Tiada'}`, 14, 40);
+
+            // Header jadual
+            doc.setFontSize(10);
+            const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Total Hours", "Total OT"];
+            let y = 50;
+            headers.forEach((header, i) => {
+                doc.text(header, 14 + i * 30, y);
+            });
+            y += 10;
+
+            // Data kehadiran
+            for (let i = 1; i <= 31; i++) {
+                const date = new Date(startOfMonth.getFullYear(), startOfMonth.getMonth(), i);
+                if (date > endOfMonth) break;
+
+                const dateString = date.toISOString().slice(0, 10);
+                const weekday = date.toLocaleDateString('ms-MY', { weekday: 'long' });
+
+                const record = data.find(d => d.date.toDate().toISOString().slice(0, 10) === dateString) || {};
+
+                const clockIn = record.clockIn ? record.clockIn.toDate().toLocaleTimeString('ms-MY') : '';
+                const clockOut = record.clockOut ? record.clockOut.toDate().toLocaleTimeString('ms-MY') : '';
+                const totalHours = record.totalHours ? record.totalHours.toFixed(2) : '';
+                const totalOT = record.totalOT ? record.totalOT.toFixed(2) : '';
+
+                doc.text(dateString, 14, y);
+                doc.text(weekday, 44, y);
+                doc.text(clockIn, 74, y);
+                doc.text(clockOut, 104, y);
+                doc.text(totalHours, 134, y);
+                doc.text(totalOT, 164, y);
+                y += 5;
+            }
+
+            // Statistic
+            y += 10;
+            doc.text('Statistic', 14, y);
+
             doc.save('Laporan_Kehadiran.pdf');
         };
 
@@ -549,21 +531,23 @@
             attendanceTableBody.innerHTML = '';
             data.forEach(item => {
                 const row = document.createElement('tr');
+                const date = item.date.toDate().toISOString().slice(0, 10);
+                const weekday = item.weekday;
+                const clockInTime = item.clockIn ? item.clockIn.toDate().toLocaleTimeString('ms-MY') : '-';
+                const clockOutTime = item.clockOut ? item.clockOut.toDate().toLocaleTimeString('ms-MY') : '-';
+                const totalHours = item.totalHours ? item.totalHours.toFixed(2) : '-';
+                const totalOT = item.totalOT ? item.totalOT.toFixed(2) : '-';
+
                 row.innerHTML = `
-                    <td>${item.date.toDate().toISOString().slice(0, 10)}</td>
-                    <td>${item.weekday}</td>
-                    <td>${item.clockIn ? item.clockIn.toDate().toLocaleTimeString() : '-'}</td>
-                    <td>${item.clockOut ? item.clockOut.toDate().toLocaleTimeString() : '-'}</td>
-                    <td>${item.totalHours?.toFixed(2) || '-'}</td>
-                    <td>${item.totalOT?.toFixed(2) || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${weekday}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${clockInTime}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${clockOutTime}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalHours}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${totalOT}</td>
                 `;
                 attendanceTableBody.appendChild(row);
             });
-        }
-
-        // QR Code
-        function generateQRCode(data) {
-            QRCode.toCanvas(document.getElementById('qrCodeCanvas'), data, err => err && console.error(err));
         }
 
         // Util
@@ -585,7 +569,6 @@
                     if (snap.exists()) {
                         userData = snap.data();
                         userNameDisplay.textContent = `Selamat Datang, ${userData.name}`;
-                        generateQRCode(userId);
 
                         if (userData.faceDescriptor) {
                             try {
@@ -612,7 +595,6 @@
                             showPage('faceRegistrationPage');
                         } else {
                             showPage('dashboard');
-                            handleGeolocationCheck();
                         }
                     } else {
                         showPage('faceRegistrationPage');
@@ -634,14 +616,6 @@
             document.getElementById('faceScanBtn').addEventListener('click', window.handleFaceCheck);
             document.getElementById('generatePdfBtn').addEventListener('click', window.generatePDF);
             document.getElementById('signOutBtn').addEventListener('click', window.handleSignOut);
-            document.getElementById('downloadQrBtn').addEventListener('click', () => {
-                const canvas = document.getElementById('qrCodeCanvas');
-                const pngUrl = canvas.toDataURL("image/png");
-                const downloadLink = document.createElement('a');
-                downloadLink.href = pngUrl;
-                downloadLink.download = `qrcode_${userId}.png`;
-                downloadLink.click();
-            });
         });
     </script>
 </body>

@@ -528,7 +528,6 @@
     const year = now.getFullYear();
     const month = now.getMonth();
 
-    // Fix: Correct start and end dates for current month
     const startOfMonth = new Date(year, month, 1);
     const endOfMonth = new Date(year, month + 1, 0);
 
@@ -545,20 +544,19 @@
         unit: 'mm'
     });
 
-    doc.setFont('times', 'normal');
-    doc.addFont('Times-New-Roman', 'times', 'normal');
-    doc.addFont('Times-New-Roman-Bold', 'times', 'bold');
+    // Use standard fonts instead of trying to load custom ones
+    doc.setFont('helvetica', 'normal');
 
     // Headers and User Info
     const pageWidth = doc.internal.pageSize.getWidth();
     doc.setFontSize(14);
-    doc.setFont('times', 'bold');
+    doc.setFont('helvetica', 'bold');
     const title = 'Total Time Card';
     const titleWidth = doc.getTextWidth(title);
     doc.text(title, (pageWidth - titleWidth) / 2, 20);
     
     doc.setFontSize(10);
-    doc.setFont('times', 'normal');
+    doc.setFont('helvetica', 'normal');
     const startStr = startOfMonth.toISOString().slice(0, 10);
     const endStr = endOfMonth.toISOString().slice(0, 10);
     doc.text(`Start Date ${startStr} End Date ${endStr}`, 14, 30);
@@ -570,7 +568,7 @@
     let y = 45;
     let x = 14;
 
-    doc.setFont('times', 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.setDrawColor(0);
     doc.setLineWidth(0.2);
     
@@ -582,7 +580,7 @@
     
     // Table Body and Data
     y += 8;
-    doc.setFont('times', 'normal');
+    doc.setFont('helvetica', 'normal');
     let totalHours = 0;
     let totalOT = 0;
     
@@ -640,7 +638,7 @@
 
     // Statistic Row
     y += 5;
-    doc.setFont('times', 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.rect(14, y - 5, colWidths.reduce((a, b) => a + b, 0), 8); // Full row border
     doc.text('Statistic', 16, y);
     doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 16 + colWidths[0] + colWidths[1], y);

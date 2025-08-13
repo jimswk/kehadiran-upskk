@@ -8,10 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- QR Code -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-    <!-- jsQR for scanning QR codes -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <!-- face-api.js -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         body {
@@ -137,34 +135,21 @@
             <div id="scanModeContainer" class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
                 <h3 class="text-xl font-bold mb-2 text-center text-gray-800">Clock In/Out</h3>
                 <div id="faceScanMode">
-                    <p class="mb-4 text-center text-gray-600">Imbas wajah anda untuk Clock In/Out.</p>
+                    <p class="mb-4 text-center text-gray-600" id="locationStatus">Mengesan lokasi...</p>
                     <div class="relative">
                         <video id="scanVideoElement" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
                         <div id="scanFaceFrame" class="absolute inset-0 border-4 rounded-lg hidden"></div>
                     </div>
-                    <button id="faceScanBtn" class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200">
+                    <button id="faceScanBtn" class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                         Clock In / Clock Out
                     </button>
-                    <button id="switchToQrBtn" class="mt-4 w-full text-blue-600 hover:underline">Gunakan QR Code</button>
-                </div>
-                <div id="qrScanMode" class="hidden">
-                    <p class="mb-4 text-center text-gray-600">Imbas QR Code untuk Clock In/Out atau muat naik imej.</p>
-                    <video id="qrScannerVideo" autoplay muted playsinline class="w-full h-auto rounded-lg mb-4 bg-gray-200"></video>
-                    <canvas id="qrCanvas" class="hidden"></canvas>
-                    <button id="switchToFaceBtn" class="mt-4 w-full text-blue-600 hover:underline">Gunakan Pengecaman Wajah</button>
-                    <button id="toggleCameraBtn" class="mt-4 w-full py-2 px-4 text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 transition-colors duration-200">
-                        Tukar Kamera
-                    </button>
-                    <label for="qrUploadInput" class="mt-4 w-full py-2 px-4 text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 transition-colors duration-200 cursor-pointer text-center">
-                        Muat Naik QR Code
-                    </label>
-                    <input type="file" id="qrUploadInput" accept="image/*" class="hidden">
                 </div>
             </div>
 
             <div class="my-8 w-full max-w-sm">
                 <h3 class="text-xl font-bold mb-2 text-center text-gray-800">QR Code Anda</h3>
                 <div class="flex flex-col items-center p-4 bg-gray-50 rounded-lg shadow-inner">
+                    <p class="text-sm text-gray-600 mb-2">QR code ini unik untuk akaun anda.</p>
                     <canvas id="qrCodeCanvas" class="border rounded-lg bg-white p-2"></canvas>
                     <a id="downloadQrBtn" class="mt-4 w-full py-2 px-4 text-center text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200 cursor-pointer">
                         Muat Turun QR Code
@@ -225,7 +210,7 @@
         const auth = getAuth(app);
         const appId = 'default-app-id';
 
-        // Koordinat pejabat (tukar jika perlu)
+        // Koordinat pejabat
         const officeCoordinates = { latitude: 1.54287, longitude: 110.34752 };
         const locationTolerance = 50; // dalam meter
 
@@ -235,9 +220,8 @@
         let userData = null;
         let videoStream = null;
         let isProcessing = false;
-        let qrScannerInterval = null;
-        let allCameras = [];
-        let currentCameraIndex = 0;
+        let faceMatcher = null;
+        let faceDetectionInterval = null;
 
         // DOM Elements
         const loginPageDiv = document.getElementById('loginPage');
@@ -247,21 +231,13 @@
         const statusMessageDiv = document.getElementById('statusMessage');
         const videoElement = document.getElementById('videoElement');
         const scanVideoElement = document.getElementById('scanVideoElement');
-        const qrScannerVideo = document.getElementById('qrScannerVideo');
         const canvasElement = document.getElementById('canvasElement');
-        const qrCanvas = document.getElementById('qrCanvas');
         const attendanceTableBody = document.getElementById('attendanceTableBody');
         const userNameDisplay = document.getElementById('userName');
         const userIdDisplay = document.getElementById('userIdDisplay');
-        const faceScanModeDiv = document.getElementById('faceScanMode');
-        const qrScanModeDiv = document.getElementById('qrScanMode');
         const faceScanBtn = document.getElementById('faceScanBtn');
-        const switchToQrBtn = document.getElementById('switchToQrBtn');
-        const switchToFaceBtn = document.getElementById('switchToFaceBtn');
-        const downloadQrBtn = document.getElementById('downloadQrBtn');
-        const toggleCameraBtn = document.getElementById('toggleCameraBtn');
-        const qrUploadInput = document.getElementById('qrUploadInput');
-
+        const registerFaceSubmitBtn = document.getElementById('registerFaceSubmitBtn');
+        const locationStatusEl = document.getElementById('locationStatus');
 
         window.jsPDF = window.jspdf.jsPDF;
 
@@ -314,53 +290,49 @@
                 videoStream.getTracks().forEach(track => track.stop());
                 videoStream = null;
             }
-             if (qrScannerInterval) {
-                clearInterval(qrScannerInterval);
-                qrScannerInterval = null;
-            }
         }
-
-        async function startCamera(videoEl, deviceId) {
+        
+        async function startCamera(videoEl) {
             stopCamera();
-            const constraints = { video: { deviceId: deviceId ? { exact: deviceId } : undefined } };
             try {
-                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 videoEl.srcObject = videoStream;
             } catch (error) {
                 showStatusMessage('Gagal mengakses kamera. Sila berikan kebenaran.', 'error');
                 console.error(error);
             }
         }
-        
-        async function listCameras() {
+
+        // Memuat model Face-API.js
+        async function loadFaceModels() {
+            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/weights';
+            showStatusMessage('Memuatkan model pengecaman wajah...', 'info');
             try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                allCameras = devices.filter(device => device.kind === 'videoinput');
-                if (allCameras.length > 1) {
-                    toggleCameraBtn.classList.remove('hidden');
-                } else {
-                    toggleCameraBtn.classList.add('hidden');
-                }
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.load(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.load(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.load(MODEL_URL)
+                ]);
+                showStatusMessage('Model pengecaman wajah berjaya dimuatkan.', 'success');
+                return true;
             } catch (error) {
-                console.error("Error listing devices:", error);
+                showStatusMessage('Gagal memuatkan model pengecaman wajah.', 'error');
+                console.error('Error loading face-api models:', error);
+                return false;
             }
         }
 
-        async function toggleCamera() {
-            if (allCameras.length > 1) {
-                currentCameraIndex = (currentCameraIndex + 1) % allCameras.length;
-                const newDeviceId = allCameras[currentCameraIndex].deviceId;
-                await startCamera(qrScannerVideo, newDeviceId);
-            }
+        function createFaceMatcher(descriptor) {
+            const labeledDescriptors = [
+                new faceapi.LabeledFaceDescriptors(userId, [new Float32Array(JSON.parse(descriptor))])
+            ];
+            faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
         }
 
-        function captureImage(videoEl) {
-            const context = canvasElement.getContext('2d');
-            canvasElement.width = videoEl.videoWidth;
-            canvasElement.height = videoEl.videoHeight;
-            context.drawImage(videoEl, 0, 0, canvasElement.width, canvasElement.height);
-            const imageData = canvasElement.toDataURL('image/jpeg', 0.8);
-            return imageData.split(',')[1];
+        async function registerFaceAndGetDescriptor() {
+            const detections = await faceapi.detectSingleFace(videoElement, new faceapi.TinyFaceDetectorOptions())
+                                             .withFaceLandmarks().withFaceDescriptor();
+            return detections ? Array.from(detections.descriptor) : null;
         }
 
         // Fungsi pendaftaran akaun baru
@@ -382,7 +354,7 @@
                 await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data'), {
                     name: name,
                     department: department,
-                    referenceImages: []
+                    faceDescriptor: null // Simpan deskriptor bukan imej
                 });
                 showStatusMessage('Pendaftaran akaun berjaya! Sila daftar wajah anda seterusnya.', 'success');
                 showPage('faceRegistrationPage');
@@ -422,26 +394,43 @@
             if (isProcessing) return;
             isProcessing = true;
             registerFaceSubmitBtn.disabled = true;
+
             showStatusMessage('Memulakan kamera...', 'info');
             await startCamera(videoElement);
 
+            const modelsLoaded = await loadFaceModels();
+            if (!modelsLoaded) {
+                 isProcessing = false;
+                 registerFaceSubmitBtn.disabled = false;
+                 return;
+            }
+
             try {
                 await new Promise(resolve => setTimeout(resolve, 2000));
-                showStatusMessage('Mengambil gambar wajah dari pelbagai sudut...', 'info');
-                
-                const referenceImages = [];
-                for (let i = 0; i < 5; i++) {
-                    referenceImages.push(captureImage(videoElement));
+                showStatusMessage('Mengimbas wajah, sila kekalkan wajah anda di hadapan kamera.', 'info');
+
+                let faceDescriptor = null;
+                const startTime = Date.now();
+                while (Date.now() - startTime < 5000) { // Cuba selama 5 saat
+                    faceDescriptor = await registerFaceAndGetDescriptor();
+                    if (faceDescriptor) break;
                     await new Promise(resolve => setTimeout(resolve, 500));
+                }
+
+                if (!faceDescriptor) {
+                    showStatusMessage('Gagal mengesan wajah. Sila cuba lagi.', 'error');
+                    return;
                 }
                 
                 const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
                 await setDoc(userDocRef, {
-                    referenceImages: referenceImages
+                    faceDescriptor: JSON.stringify(faceDescriptor) // Simpan sebagai string JSON
                 }, { merge: true });
 
                 isFaceRegistered = true;
-                showStatusMessage('Pendaftaran wajah berjaya! Sila log keluar untuk memulakan sistem.', 'success');
+                showStatusMessage('Pendaftaran wajah berjaya!', 'success');
+                createFaceMatcher(faceDescriptor);
+
             } catch (error) {
                 showStatusMessage('Gagal mendaftar wajah. Sila cuba lagi.', 'error');
                 console.error(error);
@@ -452,32 +441,27 @@
             }
         };
 
-        async function recognizeFaceWithGemini(referenceImages, liveImage) {
-            const prompt = `Adakah muka dalam gambar 'live' sepadan dengan muka dalam mana-mana gambar dalam senarai 'rujukan'? Jawab dengan 'match' atau 'no match' sahaja. Jangan berikan sebarang maklumat tambahan.`;
-            
-            const parts = [{ text: prompt }];
-            for (const image of referenceImages) {
-                parts.push({ inlineData: { mimeType: "image/jpeg", data: image } });
-            }
-            parts.push({ inlineData: { mimeType: "image/jpeg", data: liveImage } });
-
-            const payload = { contents: [{ parts: parts }] };
-            const apiKey = "";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
+        async function handleGeolocationCheck() {
+            faceScanBtn.disabled = true;
+            locationStatusEl.textContent = 'Mengesan lokasi...';
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
                 });
-                const result = await response.json();
-                
-                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-                return text?.toLowerCase().trim() === 'match';
+                const { latitude, longitude } = position.coords;
+                const distance = calculateDistance(latitude, longitude, officeCoordinates.latitude, officeCoordinates.longitude);
+
+                if (distance <= locationTolerance) {
+                    locationStatusEl.textContent = `Anda berada dalam kawasan pejabat (${distance.toFixed(2)}m).`;
+                    faceScanBtn.disabled = false;
+                } else {
+                    locationStatusEl.textContent = `Anda berada di luar kawasan pejabat (${distance.toFixed(2)}m).`;
+                    faceScanBtn.disabled = true;
+                }
             } catch (error) {
-                console.error("Gemini API call failed:", error);
-                return false;
+                locationStatusEl.textContent = 'Gagal mengesan lokasi. Sila benarkan akses lokasi.';
+                console.error('Geolocation error:', error);
+                faceScanBtn.disabled = true;
             }
         }
 
@@ -485,25 +469,30 @@
             if (isProcessing) return;
             isProcessing = true;
             faceScanBtn.disabled = true;
+            showStatusMessage('Mengimbas wajah...', 'info');
 
-            showStatusMessage('Mengambil gambar dan membandingkan wajah...', 'info');
+            const modelsLoaded = await loadFaceModels();
+            if (!modelsLoaded) {
+                 isProcessing = false;
+                 return;
+            }
             await startCamera(scanVideoElement);
 
             try {
                 await new Promise(resolve => setTimeout(resolve, 2000));
-                const liveImage = captureImage(scanVideoElement);
+                const detections = await faceapi.detectSingleFace(scanVideoElement, new faceapi.TinyFaceDetectorOptions())
+                                                  .withFaceLandmarks().withFaceDescriptor();
 
-                const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
-                const userDocSnap = await getDoc(userDocRef);
-                const referenceImages = userDocSnap.data().referenceImages;
-                
-                const isMatch = await recognizeFaceWithGemini(referenceImages, liveImage);
-
-                if (isMatch) {
-                    showStatusMessage('Wajah sepadan! Melakukan tindakan clock...', 'success');
-                    await window.handleClockAction();
+                if (detections) {
+                    const match = faceMatcher.findBestMatch(detections.descriptor);
+                    if (match.label === userId && match.distance < 0.6) { // Jarak 0.6 adalah toleransi
+                        showStatusMessage('Wajah sepadan! Melakukan tindakan clock...', 'success');
+                        await window.handleClockAction();
+                    } else {
+                        showStatusMessage('Wajah tidak sepadan. Sila cuba lagi.', 'error');
+                    }
                 } else {
-                    showStatusMessage('Wajah tidak sepadan. Sila cuba lagi.', 'error');
+                    showStatusMessage('Wajah tidak dikesan. Sila cuba lagi.', 'error');
                 }
             } catch (error) {
                 showStatusMessage('Gagal mengesan wajah. Sila cuba lagi.', 'error');
@@ -511,119 +500,67 @@
             } finally {
                 isProcessing = false;
                 faceScanBtn.disabled = false;
+                stopCamera();
             }
         };
 
-        window.switchToQrScanMode = function() {
-            faceScanModeDiv.classList.add('hidden');
-            qrScanModeDiv.classList.remove('hidden');
-            listCameras();
-            startQrScan();
-            showStatusMessage('Sedia untuk imbas QR code.', 'info');
-        };
-
-        window.switchToFaceScanMode = function() {
-            faceScanModeDiv.classList.remove('hidden');
-            qrScanModeDiv.classList.add('hidden');
-            stopCamera();
-            hideStatusMessage();
-        };
-
-        async function startQrScan() {
-            await startCamera(qrScannerVideo);
-            const qrContext = qrCanvas.getContext('2d');
-            qrScannerInterval = setInterval(() => {
-                if (qrScannerVideo.readyState === qrScannerVideo.HAVE_ENOUGH_DATA) {
-                    qrCanvas.height = qrScannerVideo.videoHeight;
-                    qrCanvas.width = qrScannerVideo.videoWidth;
-                    qrContext.drawImage(qrScannerVideo, 0, 0, qrCanvas.width, qrCanvas.height);
-                    const imageData = qrContext.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-                    
-                    if (code) {
-                        clearInterval(qrScannerInterval);
-                        stopCamera();
-                        const scannedData = code.data;
-                        if (scannedData === userId) {
-                           showStatusMessage('QR Code sepadan. Melakukan tindakan clock...', 'success');
-                           window.handleClockAction();
-                        } else {
-                            showStatusMessage('QR Code tidak sepadan.', 'error');
-                        }
-                    }
-                }
-            }, 1000/30);
-        }
-        
         window.handleClockAction = async function() {
-            showStatusMessage('Dapatkan lokasi...', 'info');
-            try {
-                const position = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
-                });
-                const { latitude, longitude } = position.coords;
-                const distance = calculateDistance(latitude, longitude, officeCoordinates.latitude, officeCoordinates.longitude);
+            showStatusMessage('Lokasi disahkan. Menyimpan data...', 'info');
+            const docRef = doc(db, 'artifacts', appId, 'users', userId, 'attendance', getCurrentDate());
+            const docSnap = await getDoc(docRef);
+            const currentTime = new Date();
+            const lastClockInTime = docSnap.exists() && docSnap.data().clockIn ? docSnap.data().clockIn.toDate() : null;
 
-                if (distance > locationTolerance) {
-                    showStatusMessage(`Anda berada ${distance.toFixed(2)}m dari pejabat.`, 'error');
-                    return;
-                }
-                showStatusMessage('Lokasi disahkan. Menyimpan data...', 'info');
+            // Logic to determine shift and OT
+            let isClockInLate = false;
+            let isClockOutEarly = false;
+            let totalHours = 0;
+            let totalOT = 0;
+            let matchedShift = shifts[0];
+            const timeInToday = new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate(), currentTime.getHours(), currentTime.getMinutes());
 
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'attendance', getCurrentDate());
-                const docSnap = await getDoc(docRef);
-                const currentTime = new Date();
-
-                if (docSnap.exists() && docSnap.data().clockIn) {
-                    const clockInTime = docSnap.data().clockIn.toDate();
-                    const totalHours = (currentTime - clockInTime) / (1000 * 60 * 60);
-                    
-                    const timeInToday = new Date(clockInTime.getFullYear(), clockInTime.getMonth(), clockInTime.getDate(), clockInTime.getHours(), clockInTime.getMinutes());
-                    let minTimeDiff = Infinity;
-                    let matchedShift = shifts[0];
-                    shifts.forEach(shift => {
-                        const shiftStart = new Date(timeInToday.getFullYear(), timeInToday.getMonth(), timeInToday.getDate(), shift.start.hour, shift.start.minute);
-                        const timeDiff = Math.abs(timeInToday.getTime() - shiftStart.getTime());
-                        if (timeDiff < minTimeDiff) {
-                            minTimeDiff = timeDiff;
-                            matchedShift = shift;
-                        }
-                    });
-
-                    const clockOutTimeExpected = new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate(), matchedShift.end.hour, matchedShift.end.minute);
-                    const isClockOutEarly = currentTime < clockOutTimeExpected;
-                    let totalOT = 0;
-                    if (currentTime > clockOutTimeExpected) {
-                        totalOT = (currentTime - clockOutTimeExpected) / (1000 * 60 * 60);
+            if (lastClockInTime) {
+                // Clock Out
+                totalHours = (currentTime - lastClockInTime) / (1000 * 60 * 60);
+                
+                let minTimeDiff = Infinity;
+                shifts.forEach(shift => {
+                    const shiftStart = new Date(lastClockInTime.getFullYear(), lastClockInTime.getMonth(), lastClockInTime.getDate(), shift.start.hour, shift.start.minute);
+                    const timeDiff = Math.abs(lastClockInTime.getTime() - shiftStart.getTime());
+                    if (timeDiff < minTimeDiff) {
+                        minTimeDiff = timeDiff;
+                        matchedShift = shift;
                     }
+                });
 
-                    await setDoc(docRef, {
-                        clockOut: currentTime,
-                        totalHours,
-                        totalOT,
-                        locationOut: { lat: latitude, lng: longitude },
-                        isClockOutEarly,
-                        matchedShift: matchedShift.id
-                    }, { merge: true });
-                    showStatusMessage('Clock Out Berjaya!', 'success');
-                } else {
-                    const timeInToday = new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate(), currentTime.getHours(), currentTime.getMinutes());
-                    const shift1Start = new Date(timeInToday.getFullYear(), timeInToday.getMonth(), timeInToday.getDate(), shifts[0].start.hour, shifts[0].start.minute);
-                    const isClockInLate = timeInToday > shift1Start;
+                const clockOutTimeExpected = new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate(), matchedShift.end.hour, matchedShift.end.minute);
+                isClockOutEarly = currentTime < clockOutTimeExpected;
 
-                    await setDoc(docRef, {
-                        date: currentTime,
-                        weekday: currentTime.toLocaleDateString('ms-MY', { weekday: 'long' }),
-                        clockIn: currentTime,
-                        locationIn: { lat: latitude, lng: longitude },
-                        isClockInLate
-                    }, { merge: true });
-                    showStatusMessage('Clock In Berjaya!', 'success');
+                if (currentTime > clockOutTimeExpected) {
+                    totalOT = (currentTime - clockOutTimeExpected) / (1000 * 60 * 60);
                 }
-            } catch (error) {
-                showStatusMessage('Gagal akses lokasi.', 'error');
-                console.error(error);
+
+                await setDoc(docRef, {
+                    clockOut: currentTime,
+                    totalHours,
+                    totalOT,
+                    isClockOutEarly,
+                }, { merge: true });
+                showStatusMessage('Clock Out Berjaya!', 'success');
+            } else {
+                // Clock In
+                const shift1Start = new Date(timeInToday.getFullYear(), timeInToday.getMonth(), timeInToday.getDate(), shifts[0].start.hour, shifts[0].start.minute);
+                isClockInLate = timeInToday > shift1Start;
+
+                await setDoc(docRef, {
+                    date: currentTime,
+                    weekday: currentTime.toLocaleDateString('ms-MY', { weekday: 'long' }),
+                    clockIn: currentTime,
+                    isClockInLate
+                }, { merge: true });
+                showStatusMessage('Clock In Berjaya!', 'success');
             }
+            handleGeolocationCheck();
         };
 
         window.generatePDF = async function() {
@@ -691,50 +628,8 @@
         }
 
         function generateQRCode(data) {
-            QRCode.toCanvas(document.getElementById('qrCodeCanvas'), data, err => {
-                if (err) console.error(err);
-            });
-            
-            const canvas = document.getElementById('qrCodeCanvas');
-            const dataURL = canvas.toDataURL('image/png');
-            const downloadLink = document.getElementById('downloadQrBtn');
-            downloadLink.href = dataURL;
-            downloadLink.download = `QR_Code_${userId}.png`;
-        }
-
-        async function handleQrUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = async function() {
-                const imageData = reader.result;
-                
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    context.drawImage(img, 0, 0, img.width, img.height);
-                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-
-                    if (code) {
-                        const scannedData = code.data;
-                        if (scannedData === userId) {
-                            showStatusMessage('QR Code sepadan. Melakukan tindakan clock...', 'success');
-                            window.handleClockAction();
-                        } else {
-                            showStatusMessage('QR Code tidak sepadan.', 'error');
-                        }
-                    } else {
-                        showStatusMessage('Tidak dapat mengesan QR Code dari imej.', 'error');
-                    }
-                };
-                img.src = imageData;
-            };
-            reader.readAsDataURL(file);
+            // Function no longer needed, keeping for backwards compatibility if user changes mind
+            console.log('QR Code functionality removed.');
         }
 
         function getCurrentDate() { return new Date().toISOString().slice(0, 10); }
@@ -743,6 +638,9 @@
 
         // Inisialisasi
         window.onload = async function() {
+            // Load Face-API.js models on page load
+            await loadFaceModels();
+
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     userId = user.uid;
@@ -753,8 +651,11 @@
                         userData = userDocSnap.data();
                         userNameDisplay.textContent = `Selamat Datang, ${userData.name}`;
                         userIdDisplay.textContent = `ID: ${userId}`;
-                        generateQRCode(userId);
-                        isFaceRegistered = !!(userData.referenceImages && userData.referenceImages.length > 0);
+                        isFaceRegistered = !!userData.faceDescriptor;
+
+                        if (isFaceRegistered) {
+                           createFaceMatcher(userData.faceDescriptor);
+                        }
                         
                         const q = query(
                             collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
@@ -771,8 +672,8 @@
                             showPage('faceRegistrationPage');
                         } else {
                             showPage('dashboard');
+                            handleGeolocationCheck();
                         }
-
                     } else {
                         showStatusMessage('Sila lengkapkan pendaftaran akaun anda dengan mendaftar wajah.', 'info');
                         showPage('faceRegistrationPage');
@@ -801,23 +702,11 @@
             if (document.getElementById('faceScanBtn')) {
                 document.getElementById('faceScanBtn').addEventListener('click', window.handleFaceCheck);
             }
-            if (document.getElementById('switchToQrBtn')) {
-                document.getElementById('switchToQrBtn').addEventListener('click', window.switchToQrScanMode);
-            }
-            if (document.getElementById('switchToFaceBtn')) {
-                document.getElementById('switchToFaceBtn').addEventListener('click', window.switchToFaceScanMode);
-            }
             if (document.getElementById('generatePdfBtn')) {
                 document.getElementById('generatePdfBtn').addEventListener('click', window.generatePDF);
             }
             if (document.getElementById('signOutBtn')) {
                 document.getElementById('signOutBtn').addEventListener('click', window.handleSignOut);
-            }
-            if (document.getElementById('qrUploadInput')) {
-                document.getElementById('qrUploadInput').addEventListener('change', handleQrUpload);
-            }
-            if (document.getElementById('toggleCameraBtn')) {
-                document.getElementById('toggleCameraBtn').addEventListener('click', window.toggleCamera);
             }
         });
     </script>

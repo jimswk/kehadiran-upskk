@@ -529,14 +529,11 @@
         const year = now.getFullYear();
         const month = now.getMonth();
 
-        // 1. Tentukan rentang tanggal dengan TZ lokal Malaysia (GMT+8)
+        // 1. Tentukan rentang tanggal
         const startOfMonth = new Date(year, month, 1, 0, 0, 0);
         const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59);
 
-        console.log("Tanggal Awal (Local):", startOfMonth.toString());
-        console.log("Tanggal Akhir (Local):", endOfMonth.toString());
-
-        // 2. Query Firestore dengan rentang UTC
+        // 2. Ambil data dari Firestore
         const q = query(
             collection(db, 'artifacts', appId, 'users', userId, 'attendance'),
             where('date', '>=', startOfMonth),
@@ -546,20 +543,15 @@
         const snap = await getDocs(q);
         const data = snap.docs.map(d => {
             const docData = d.data();
-            const date = docData.date.toDate();
-            // Sesuaikan dengan TZ Malaysia
-            date.setMinutes(date.getMinutes() + date.getTimezoneOffset() + 480); // GMT+8
             return {
                 id: d.id,
-                date: date,
+                date: docData.date.toDate(),
                 clockIn: docData.clockIn?.toDate(),
                 clockOut: docData.clockOut?.toDate(),
                 totalHours: docData.totalHours || 0,
                 totalOT: docData.totalOT || 0
             };
         });
-
-        console.log("Data setelah konversi TZ:", data);
 
         // 3. Buat PDF
         const doc = new jsPDF({
@@ -568,7 +560,7 @@
             format: 'a4'
         });
 
-        // 4. Header dengan format tanggal yang benar
+        // 4. Header
         doc.setFont('helvetica');
         doc.setFontSize(14);
         doc.text('Total Time Card', 105, 20, { align: 'center' });
@@ -577,7 +569,7 @@
         doc.text(`Start Date ${formatDate(startOfMonth)} End Date ${formatDate(endOfMonth)}`, 14, 30);
         doc.text(`First Name: ${userData?.name || '-'}, Department: ${userData?.department || '-'}`, 14, 35);
 
-        // 5. Tabel kehadiran
+        // 5. Tabel
         const headers = ["Date", "Weekday", "Clock In", "Clock Out", "Hours", "OT"];
         const colWidths = [25, 25, 25, 25, 20, 20];
         let y = 45;
@@ -610,7 +602,7 @@
             const clockIn = record?.clockIn;
             const clockOut = record?.clockOut;
             
-            // Format waktu dengan AM/PM
+            // Format waktu
             const clockInStr = clockIn ? formatTime(clockIn) : '-';
             const clockOutStr = clockOut ? formatTime(clockOut) : '-';
             
@@ -624,19 +616,26 @@
             if (record?.totalHours) totalHours += record.totalHours;
             if (record?.totalOT) totalOT += record.totalOT;
 
-            // Gambar baris
+            // Gambar baris dengan penanganan warna yang benar
             x = 14;
             [dateStr, weekday, clockInStr, clockOutStr, hours, ot].forEach((text, i) => {
                 doc.rect(x, y-5, colWidths[i], 8);
-                doc.setTextColor((i===2&&isLate)||(i===3&&isEarly) ? [255,0,0] : [0,0,0]);
-                doc.text(text, x+2, y);
+                
+                // PERBAIKAN UTAMA: Format setTextColor yang benar
+                if ((i === 2 && isLate) || (i === 3 && isEarly)) {
+                    doc.setTextColor(255, 0, 0); // Format RGB numerik
+                } else {
+                    doc.setTextColor(0, 0, 0);
+                }
+                
+                doc.text(text.toString(), x+2, y);
                 x += colWidths[i];
             });
             
             y += 8;
         }
 
-        // 6. Footer statistik
+        // 6. Footer
         doc.setFont('helvetica', 'bold');
         doc.text(`Total Hours: ${totalHours.toFixed(2)} | Total OT: ${totalOT.toFixed(2)}`, 14, y+10);
         
@@ -644,13 +643,13 @@
         doc.save(`Laporan_Kehadiran_${userData.name}_${year}_${month+1}.pdf`);
 
     } catch (error) {
-        console.error("PDF Error:", error);
-        showStatusMessage('Gagal membuat laporan: ' + error.message, 'error');
+        console.error("Error generating PDF:", error);
+        showStatusMessage('Gagal membuat laporan PDF. Silakan coba lagi.', 'error');
     }
 
     // Fungsi pembantu
     function formatDate(date) {
-        return date.toLocaleDateString('en-CA'); // YYYY-MM-DD
+        return date.toISOString().split('T')[0]; // YYYY-MM-DD
     }
     
     function formatTime(date) {
